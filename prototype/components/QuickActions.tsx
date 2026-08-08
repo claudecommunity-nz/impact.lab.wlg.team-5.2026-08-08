@@ -10,7 +10,7 @@ import { usePathname } from 'next/navigation'
 
 const ACTIONS = [
   { href: '/report', label: 'Report an issue' },
-  { href: '/map', label: 'What people are reporting' },
+  { href: '/map', label: 'Map for Communities' },
   { href: '/track', label: 'Track a report' },
   { href: '/wcc', label: 'Council console' },
 ]
