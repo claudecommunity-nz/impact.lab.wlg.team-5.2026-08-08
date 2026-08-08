@@ -1,0 +1,70 @@
+:root{
+/* Brand — from wellington.govt.nz/your-council/brand-assets-and-guidelines */
+--wcc-yellow:#FFDD00; /* Pantone 109 C · Resene Absolutely Yellow */
+--wcc-black:#000000;  /* Pantone Black C */
+--wcc-white:#FFFFFF;
+
+/* Yellow ramp (tints/shades of the brand yellow, for states only) */
+--yellow-100:#FFFBDB;
+--yellow-200:#FFF3A3;
+--yellow-300:#FFEB5C;
+--yellow-400:#FFE329;
+--yellow-500:#FFDD00;
+--yellow-600:#E6C700;
+--yellow-700:#C4AA00;
+
+/* Neutrals */
+--grey-000:#FFFFFF;
+--grey-050:#F7F7F5;
+--grey-100:#F0F0EE;
+--grey-200:#E2E2DF;
+--grey-300:#C9C9C4;
+--grey-400:#9B9B95;
+--grey-500:#6E6E68;
+--grey-600:#4A4A45;
+--grey-700:#2E2E2B;
+--grey-800:#1A1A18;
+--grey-900:#000000;
+
+/* Functional (see readme → Intentional additions) */
+--blue-600:#0B4EA2;
+--blue-100:#E7EEF8;
+--green-600:#17703D;
+--green-100:#E6F1EA;
+--orange-600:#B05A00;
+--orange-100:#FBF0E2;
+--red-600:#B4231F;
+--red-100:#FBEAE9;
+
+/* Semantic aliases */
+--text-strong:var(--wcc-black);
+--text-body:var(--grey-800);
+--text-muted:var(--grey-500);
+--text-inverse:var(--wcc-white);
+--text-link:var(--blue-600);
+--text-link-hover:var(--wcc-black);
+
+--surface-page:var(--wcc-white);
+--surface-sunken:var(--grey-050);
+--surface-card:var(--wcc-white);
+--surface-inverse:var(--wcc-black);
+--surface-brand:var(--wcc-yellow);
+--surface-selected:var(--yellow-100);
+
+--border-subtle:var(--grey-200);
+--border-default:var(--grey-300);
+--border-strong:var(--wcc-black);
+--border-focus:var(--wcc-black);
+
+--status-success-fg:var(--green-600);
+--status-success-bg:var(--green-100);
+--status-warning-fg:var(--orange-600);
+--status-warning-bg:var(--orange-100);
+--status-error-fg:var(--red-600);
+--status-error-bg:var(--red-100);
+--status-info-fg:var(--blue-600);
+--status-info-bg:var(--blue-100);
+
+--focus-ring:var(--wcc-black);
+--focus-ring-offset:var(--wcc-yellow);
+}

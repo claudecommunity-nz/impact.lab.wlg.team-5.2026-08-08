@@ -17,45 +17,55 @@ export interface StatusDefinition {
   id: StatusId
   label: string
   residentText: string
+  /** Tailwind classes off the design system's status tokens. */
   tone: string
+  /** The same colour as a hex, for MapLibre paint and inline dots. */
   dot: string
 }
 
+// Status colours are green/orange/red/blue from the Wellington City Council
+// design system. Its readme flags them as an intentional addition, not brand
+// colours — a service-request product needs Received / In progress / Resolved
+// states and a two-colour brand palette cannot carry them.
+//
+// Grey for received and no-action is deliberate: nothing has happened yet in
+// one case and nothing will in the other, and colouring either would overstate
+// it. Orange means unresolved and unassigned, blue means in hand.
 export const STATUSES: StatusDefinition[] = [
   {
     id: 'received',
     label: 'Received',
     residentText: 'We have your report. It is in the queue to be looked at.',
-    tone: 'bg-slate-100 text-slate-700 border-slate-300',
-    dot: '#64748b',
+    tone: 'bg-grey-100 text-grey-700 border-grey-200',
+    dot: '#6E6E68', // --grey-500
   },
   {
     id: 'checking',
     label: 'Being checked',
     residentText: 'Someone at the Council is checking this now.',
-    tone: 'bg-amber-50 text-amber-800 border-amber-300',
-    dot: '#d97706',
+    tone: 'bg-warning-bg text-warning-fg border-warning-bg',
+    dot: '#B05A00', // --orange-600
   },
   {
     id: 'acting',
     label: 'Being acted on',
     residentText: 'This has been passed to a crew or agency to deal with.',
-    tone: 'bg-blue-50 text-blue-800 border-blue-300',
-    dot: '#2563eb',
+    tone: 'bg-info-bg text-info-fg border-info-bg',
+    dot: '#0B4EA2', // --blue-600
   },
   {
     id: 'resolved',
     label: 'Resolved',
     residentText: 'This has been dealt with. Thank you for reporting it.',
-    tone: 'bg-emerald-50 text-emerald-800 border-emerald-300',
-    dot: '#059669',
+    tone: 'bg-success-bg text-success-fg border-success-bg',
+    dot: '#17703D', // --green-600
   },
   {
     id: 'no-action',
     label: 'No action needed',
     residentText: 'We looked at this and no further action is needed.',
-    tone: 'bg-slate-100 text-slate-600 border-slate-300',
-    dot: '#94a3b8',
+    tone: 'bg-grey-100 text-grey-600 border-grey-200',
+    dot: '#9B9B95', // --grey-400
   },
 ]
 

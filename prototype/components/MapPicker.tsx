@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Map as MapLibreMap, NavigationControl, Marker } from 'maplibre-gl'
 import type { GeoJSONSource } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { BASEMAP_STYLE, WELLINGTON_CENTRE, fetchHubs } from '../lib/map'
+import { BASEMAP_STYLE, MAP_COLOUR, WELLINGTON_CENTRE, fetchHubs } from '../lib/map'
 import {
   PARCEL_MIN_ZOOM,
   emptyCollection,
@@ -67,7 +67,7 @@ export default function MapPicker({ value, onChange, onNearestHub, onSuburb }: M
         id: 'parcels-line',
         type: 'line',
         source: 'parcels',
-        paint: { 'line-color': '#6b5f4b', 'line-width': 1.1, 'line-opacity': 0.95 },
+        paint: { 'line-color': MAP_COLOUR.parcel, 'line-width': 1.1, 'line-opacity': 0.95 },
       })
 
       map.addSource('suburbs', { type: 'geojson', data: emptyCollection() })
@@ -75,7 +75,7 @@ export default function MapPicker({ value, onChange, onNearestHub, onSuburb }: M
         id: 'suburbs-line',
         type: 'line',
         source: 'suburbs',
-        paint: { 'line-color': '#123456', 'line-width': 1.2, 'line-opacity': 0.5 },
+        paint: { 'line-color': MAP_COLOUR.boundary, 'line-width': 1.2, 'line-opacity': 0.4 },
       })
       map.addLayer({
         id: 'suburbs-label',
@@ -85,9 +85,13 @@ export default function MapPicker({ value, onChange, onNearestHub, onSuburb }: M
           'text-field': ['get', 'suburb'],
           'text-size': 11,
           'text-transform': 'uppercase',
-          'text-letter-spacing': 0.05,
+          'text-letter-spacing': 0.04,
         },
-        paint: { 'text-color': '#123456', 'text-halo-color': '#ffffff', 'text-halo-width': 1.6 },
+        paint: {
+          'text-color': MAP_COLOUR.boundaryLabel,
+          'text-halo-color': MAP_COLOUR.halo,
+          'text-halo-width': 1.6,
+        },
       })
 
       map.addSource('hubs', { type: 'geojson', data: emptyCollection() })
@@ -96,11 +100,10 @@ export default function MapPicker({ value, onChange, onNearestHub, onSuburb }: M
         type: 'circle',
         source: 'hubs',
         paint: {
-          'circle-radius': 4,
-          'circle-color': '#123456',
-          'circle-opacity': 0.55,
-          'circle-stroke-width': 1,
-          'circle-stroke-color': '#ffffff',
+          'circle-radius': 5,
+          'circle-color': MAP_COLOUR.hubFill,
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': MAP_COLOUR.hubStroke,
         },
       })
 
@@ -140,7 +143,7 @@ export default function MapPicker({ value, onChange, onNearestHub, onSuburb }: M
     }
 
     if (!markerRef.current) {
-      const marker = new Marker({ color: '#b3261e', draggable: true })
+      const marker = new Marker({ color: MAP_COLOUR.boundary, draggable: true })
         .setLngLat([value.lng, value.lat])
         .addTo(map)
       marker.on('dragend', () => {
@@ -203,33 +206,38 @@ export default function MapPicker({ value, onChange, onNearestHub, onSuburb }: M
       <div className="relative">
         <div
           ref={containerRef}
-          className="h-80 w-full overflow-hidden rounded border border-council-line"
+          className="h-80 w-full overflow-hidden rounded border border-grey-300"
         />
         {zoom < PARCEL_MIN_ZOOM && (
-          <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded bg-council-ink/85 px-3 py-1.5 text-xs font-semibold text-white">
+          <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded bg-wcc-black px-3 py-1.5 text-xs font-semibold text-wcc-white">
             Zoom in to see property boundaries
           </div>
         )}
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <button type="button" className="btn-secondary" onClick={useMyLocation} disabled={locating}>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={useMyLocation}
+          disabled={locating}
+        >
           {locating ? 'Finding you…' : 'Use my location'}
         </button>
         {value && (
-          <button type="button" className="btn-secondary" onClick={zoomToPin}>
+          <button type="button" className="btn btn-secondary" onClick={zoomToPin}>
             Zoom to my pin
           </button>
         )}
       </div>
-      <p className="mt-2 hint">
+      <p className="mt-3 max-w-measure hint">
         Tap the map to drop a pin, or drag it to adjust. Faint outlines are property boundaries and
-        navy dots are Community Emergency Hubs.
+        yellow dots are Community Emergency Hubs.
       </p>
 
       {value && (
-        <p className="mt-2 text-sm font-medium">
-          Pin at {value.lat.toFixed(5)}, {value.lng.toFixed(5)}
+        <p className="mt-2 text-sm">
+          Pin at <span className="ref">{value.lat.toFixed(5)}, {value.lng.toFixed(5)}</span>
         </p>
       )}
     </div>

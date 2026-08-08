@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
-import ReportMap from './ReportMap'
+import ReportMap, { shadeFor } from './ReportMap'
 import { STATUSES, statusById } from '../lib/schema'
+import { SEVERITY_COLOUR } from '../lib/map'
 import { SERVICES, faultLabel } from '../lib/taxonomy'
 import { formatWhen, relativeWhen } from '../lib/time'
 import { countBySuburb, emptyCollection, suburbAt } from '../lib/layers'
@@ -155,20 +156,21 @@ function Header({ reports, loadedAt }: { reports: Report[]; loadedAt: Date | nul
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-bold">Incoming community reports</h1>
-        <p className="hint">
+        <h1 className="text-2xl font-bold tracking-[-0.015em]">Incoming community reports</h1>
+        <span aria-hidden="true" className="rule-yellow mt-3" />
+        <p className="mt-3 max-w-measure hint">
           Unverified public reports. Grouping is inferred from fault type and proximity, not
           confirmed. Nothing here is an operational emergency source.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
         <Stat label="Open" value={open.length} />
-        <Stat label="Urgent" value={urgent.length} tone="text-urgent" />
+        <Stat label="Urgent" value={urgent.length} tone="text-error-fg" />
         <Stat label="Not yet actioned" value={unacknowledged.length} />
         <Stat label="From hubs" value={hubs.length} />
       </div>
       {loadedAt && (
-        <p className="w-full text-xs text-council-ink/50">
+        <p className="w-full text-xs text-muted">
           Refreshed {formatWhen(loadedAt.toISOString())}, then every 5 seconds.
         </p>
       )}
@@ -178,9 +180,9 @@ function Header({ reports, loadedAt }: { reports: Report[]; loadedAt: Date | nul
 
 function Stat({ label, value, tone = '' }: { label: string; value: number; tone?: string }) {
   return (
-    <div className="card px-4 py-2 text-center">
+    <div className="card min-w-[6rem] px-4 py-2 text-center">
       <div className={`text-2xl font-bold ${tone}`}>{value}</div>
-      <div className="text-xs font-semibold uppercase tracking-wide text-council-ink/50">{label}</div>
+      <div className="text-xs font-semibold uppercase tracking-[0.04em] text-muted">{label}</div>
     </div>
   )
 }
@@ -214,7 +216,7 @@ function Queue({
 
   return (
     <div className="card flex h-[38rem] flex-col lg:h-[46rem]">
-      <div className="space-y-2 border-b border-council-line p-3">
+      <div className="space-y-2 border-b border-grey-200 p-3">
         <div className="flex gap-1">
           {([
             ['open', 'Open'],
@@ -226,8 +228,11 @@ function Queue({
               key={id}
               type="button"
               onClick={() => setFilter(id)}
-              className={`flex-1 rounded px-2 py-1.5 text-sm font-semibold ${
-                filter === id ? 'bg-council-navy text-white' : 'bg-council-sand text-council-ink/70'
+              aria-pressed={filter === id}
+              className={`min-h-tap flex-1 rounded px-2 text-sm font-semibold transition-colors duration-fast ease-standard ${
+                filter === id
+                  ? 'bg-wcc-black text-wcc-white'
+                  : 'bg-grey-100 text-grey-700 hover:bg-wcc-yellow hover:text-wcc-black'
               }`}
             >
               {label}
@@ -242,11 +247,11 @@ function Queue({
             </option>
           ))}
         </select>
-        <p className="text-xs text-council-ink/50">
+        <p className="text-xs text-muted">
           {total} report{total === 1 ? '' : 's'} in {groups.length} group{groups.length === 1 ? '' : 's'}
         </p>
         {worstSuburbs.length > 0 && (
-          <p className="text-xs text-council-ink/60">
+          <p className="text-xs text-muted">
             Most reports:{' '}
             {worstSuburbs.map(([suburb, count], i) => (
               <span key={suburb}>
@@ -258,7 +263,7 @@ function Queue({
         )}
       </div>
 
-      <ol className="flex-1 divide-y divide-council-line overflow-y-auto">
+      <ol className="flex-1 divide-y divide-grey-200 overflow-y-auto">
         {groups.map((group) => (
           <li key={group.key}>
             <GroupRow group={group} selected={selected} onSelect={onSelect} />
@@ -290,19 +295,19 @@ function GroupRow({
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="font-semibold">{faultLabel(group.service, group.faultType)}</p>
-          <p className="text-xs text-council-ink/60">
+          <p className="text-xs text-muted">
             {group.reports[0].locAddress || 'Pinned location'}
           </p>
         </div>
         {group.count > 1 && (
-          <span className="shrink-0 rounded-full bg-council-navy px-2 py-0.5 text-xs font-bold text-white">
+          <span className="shrink-0 rounded-full bg-wcc-black px-2.5 py-0.5 text-xs font-semibold text-wcc-white">
             ×{group.count}
           </span>
         )}
       </div>
 
       {group.count > 1 && (
-        <p className="mt-1 text-xs italic text-council-ink/50">
+        <p className="mt-1 text-xs italic text-muted">
           {group.count} reports within {group.radiusM}m — grouped automatically, not confirmed as the
           same incident.
         </p>
@@ -314,19 +319,21 @@ function GroupRow({
             <button
               type="button"
               onClick={() => onSelect(r.reference)}
-              className={`w-full rounded border px-2 py-1.5 text-left text-sm ${
+              aria-pressed={selected === r.reference}
+              className={`min-h-tap w-full rounded border px-2 py-1.5 text-left text-sm transition-colors duration-fast ease-standard ${
                 selected === r.reference
-                  ? 'border-council-accent bg-council-accent/5'
-                  : 'border-transparent hover:bg-council-sand'
+                  ? 'border-wcc-black bg-brand-100'
+                  : 'border-transparent hover:bg-grey-50'
               }`}
             >
               <span className="flex items-center gap-2">
                 <span
+                  aria-hidden="true"
                   className="h-2 w-2 shrink-0 rounded-full"
                   style={{ background: statusById(r.status).dot }}
                 />
-                <span className="font-mono text-xs">{r.reference}</span>
-                <span className="ml-auto text-xs text-council-ink/50">
+                <span className="ref text-xs">{r.reference}</span>
+                <span className="ml-auto text-xs text-muted">
                   {relativeWhen(r.submittedAt)}
                 </span>
               </span>
@@ -345,15 +352,20 @@ function GroupRow({
   )
 }
 
+// Status is a pill with a word in it, never a coloured dot on its own.
 function Tag({ children, tone }: { children: ReactNode; tone?: string }) {
   const tones: Record<string, string> = {
-    urgent: 'bg-red-100 text-urgent',
-    disruption: 'bg-amber-100 text-amber-900',
-    info: 'bg-slate-100 text-slate-600',
-    hub: 'bg-council-navy text-white',
+    urgent: 'bg-error-bg text-error-fg',
+    disruption: 'bg-warning-bg text-warning-fg',
+    info: 'bg-grey-100 text-grey-700',
+    hub: 'bg-wcc-yellow text-wcc-black',
   }
   return (
-    <span className={`rounded px-1.5 py-0.5 font-semibold ${(tone && tones[tone]) || tones.info}`}>
+    <span
+      className={`rounded-full px-2 py-0.5 font-semibold uppercase tracking-[0.04em] ${
+        (tone && tones[tone]) || tones.info
+      }`}
+    >
       {children}
     </span>
   )
@@ -399,18 +411,19 @@ function LayerControl({ layers, setLayers, parcelStatus, suburbsLoaded }: LayerC
   const [open, setOpen] = useState(true)
 
   return (
-    <div className="absolute right-3 top-3 w-64 rounded border border-council-line bg-white/95 text-xs shadow">
+    <div className="map-plate absolute right-3 top-3 w-64 rounded border border-grey-200 text-xs shadow-raised">
       <button
         type="button"
-        className="flex w-full items-center justify-between px-3 py-2 font-bold"
+        className="flex min-h-tap w-full items-center justify-between px-3 py-2 font-semibold"
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
       >
         Map layers
-        <span className="text-council-ink/50">{open ? '▾' : '▸'}</span>
+        <span aria-hidden="true" className="text-muted">{open ? '▾' : '▸'}</span>
       </button>
 
       {open && (
-        <div className="space-y-2.5 border-t border-council-line p-3">
+        <div className="space-y-2.5 border-t border-grey-200 p-3">
           {LAYER_OPTIONS.map((option) => (
             <div key={option.id}>
               <label className="flex cursor-pointer items-start gap-2">
@@ -424,17 +437,17 @@ function LayerControl({ layers, setLayers, parcelStatus, suburbsLoaded }: LayerC
                 />
                 <span>
                   <span className="block font-semibold">{option.label}</span>
-                  <span className="block text-council-ink/50">{option.source}</span>
+                  <span className="block text-muted">{option.source}</span>
                 </span>
               </label>
               {layers[option.id] && option.note && (
-                <p className="ml-6 mt-0.5 text-council-ink/50">{option.note}</p>
+                <p className="ml-6 mt-0.5 text-muted">{option.note}</p>
               )}
               {option.id === 'parcels' && layers.parcels && (
                 <ParcelStatus status={parcelStatus} />
               )}
               {option.id === 'suburbs' && layers.suburbs && suburbsLoaded === 0 && (
-                <p className="ml-6 mt-0.5 text-council-ink/50">Loading boundaries…</p>
+                <p className="ml-6 mt-0.5 text-muted">Loading boundaries…</p>
               )}
             </div>
           ))}
@@ -450,14 +463,14 @@ function LayerControl({ layers, setLayers, parcelStatus, suburbsLoaded }: LayerC
 // so rather than looking complete.
 function ParcelStatus({ status }: { status: ParcelStatusValue }) {
   if (status.state === 'loading') {
-    return <p className="ml-6 mt-0.5 text-council-ink/50">Loading for this view…</p>
+    return <p className="ml-6 mt-0.5 text-muted">Loading for this view…</p>
   }
   if (status.state === 'error') {
-    return <p className="ml-6 mt-0.5 font-semibold text-urgent">Could not load: {status.error}</p>
+    return <p className="ml-6 mt-0.5 font-semibold text-error-fg">Could not load: {status.error}</p>
   }
   if (status.state === 'loaded') {
     return (
-      <p className={`ml-6 mt-0.5 ${status.truncated ? 'font-semibold text-urgent' : 'text-council-ink/50'}`}>
+      <p className={`ml-6 mt-0.5 ${status.truncated ? 'font-semibold text-error-fg' : 'text-muted'}`}>
         {status.truncated
           ? `Showing 2,000 of more than 2,000 — some boundaries are missing. Zoom in.`
           : `${status.count.toLocaleString('en-NZ')} in view`}
@@ -469,26 +482,26 @@ function ParcelStatus({ status }: { status: ParcelStatusValue }) {
 
 function MapLegend({ showSuburbShading }: { showSuburbShading: boolean }) {
   return (
-    <div className="absolute bottom-3 left-3 rounded border border-council-line bg-white/95 p-3 text-xs shadow">
-      <p className="font-bold">Reported severity</p>
+    <div className="map-plate absolute bottom-3 left-3 rounded border border-grey-200 p-3 text-xs shadow-raised">
+      <p className="font-semibold">Reported severity</p>
       <ul className="mt-1 space-y-0.5">
-        <LegendDot colour="#b3261e">Urgent</LegendDot>
-        <LegendDot colour="#d97706">Causing disruption</LegendDot>
-        <LegendDot colour="#0f7b6c">Information</LegendDot>
+        <LegendDot colour={SEVERITY_COLOUR.urgent}>Urgent</LegendDot>
+        <LegendDot colour={SEVERITY_COLOUR.disruption}>Causing disruption</LegendDot>
+        <LegendDot colour={SEVERITY_COLOUR.info}>Information</LegendDot>
       </ul>
-      <p className="mt-2 max-w-[13rem] italic text-council-ink/60">
+      <p className="mt-2 max-w-[13rem] italic text-muted">
         Severity is what the reporter said, not a Council assessment.
       </p>
 
       {showSuburbShading && (
         <>
-          <p className="mt-2.5 font-bold">Reports per suburb</p>
+          <p className="mt-2.5 font-semibold">Reports per suburb</p>
           <ul className="mt-1 space-y-0.5">
-            <LegendSwatch colour="rgba(15, 123, 108, 0.20)">1–2</LegendSwatch>
-            <LegendSwatch colour="rgba(217, 119, 6, 0.28)">3–5</LegendSwatch>
-            <LegendSwatch colour="rgba(179, 38, 30, 0.34)">6 or more</LegendSwatch>
+            <LegendSwatch colour={shadeFor(1)}>1–2</LegendSwatch>
+            <LegendSwatch colour={shadeFor(3)}>3–5</LegendSwatch>
+            <LegendSwatch colour={shadeFor(6)}>6 or more</LegendSwatch>
           </ul>
-          <p className="mt-1 max-w-[13rem] italic text-council-ink/60">
+          <p className="mt-1 max-w-[13rem] italic text-muted">
             Counts follow the filters, so they are reports shown, not reports received.
           </p>
         </>
@@ -500,7 +513,7 @@ function MapLegend({ showSuburbShading }: { showSuburbShading: boolean }) {
 function LegendDot({ colour, children }: { colour: string; children: ReactNode }) {
   return (
     <li className="flex items-center gap-2">
-      <span className="h-2.5 w-2.5 rounded-full" style={{ background: colour }} />
+      <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ background: colour }} />
       {children}
     </li>
   )
@@ -510,7 +523,8 @@ function LegendSwatch({ colour, children }: { colour: string; children: ReactNod
   return (
     <li className="flex items-center gap-2">
       <span
-        className="h-3 w-4 rounded-sm border border-council-navy/40"
+        aria-hidden="true"
+        className="h-3 w-4 rounded-sm border border-grey-400"
         style={{ background: colour }}
       />
       {children}
@@ -544,10 +558,14 @@ function Detail({ report, group, suburb, onStatus }: DetailProps) {
     <div className="card flex h-[38rem] flex-col overflow-y-auto p-4 lg:h-[46rem]">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="font-mono text-xs text-council-ink/60">{report.reference}</p>
-          <h2 className="text-lg font-bold">{faultLabel(report.service, report.faultType)}</h2>
+          <p className="ref text-xs text-muted">{report.reference}</p>
+          <h2 className="mt-1 text-xl font-semibold">
+            {faultLabel(report.service, report.faultType)}
+          </h2>
         </div>
-        <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold ${status.tone}`}>
+        <span
+          className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.04em] ${status.tone}`}
+        >
           {status.label}
         </span>
       </div>
@@ -562,7 +580,7 @@ function Detail({ report, group, suburb, onStatus }: DetailProps) {
               key={i}
               src={src}
               alt={`Photo ${i + 1} from the reporter`}
-              className="h-24 w-24 rounded border border-council-line object-cover"
+              className="h-24 w-24 rounded border border-grey-200 object-cover"
             />
           ))}
         </div>
@@ -573,14 +591,14 @@ function Detail({ report, group, suburb, onStatus }: DetailProps) {
         <Row label="Suburb">
           {suburb ? (
             <>
-              {suburb} <span className="text-council-ink/45">— from the pin, not the reporter</span>
+              {suburb} <span className="text-muted">— from the pin, not the reporter</span>
             </>
           ) : (
             'Outside the Wellington City boundary'
           )}
         </Row>
         <Row label="Coordinates">
-          <span className="font-mono text-xs">
+          <span className="ref text-xs">
             {report.locLatitude.toFixed(5)}, {report.locLongitude.toFixed(5)}
           </span>
         </Row>
@@ -606,15 +624,15 @@ function Detail({ report, group, suburb, onStatus }: DetailProps) {
       </dl>
 
       {group && group.count > 1 && (
-        <p className="mt-3 rounded border border-council-line bg-council-sand p-2.5 text-xs">
+        <p className="mt-3 rounded border border-grey-200 bg-grey-50 p-2.5 text-xs">
           Grouped with {group.count - 1} other report{group.count > 2 ? 's' : ''} of the same fault
           type within {group.radiusM}m. This is a proximity heuristic — check them before treating
           it as one incident.
         </p>
       )}
 
-      <div className="mt-4 border-t border-council-line pt-4">
-        <h3 className="text-sm font-bold">Tell the reporter what is happening</h3>
+      <div className="mt-4 border-t border-grey-200 pt-4">
+        <h3 className="text-base font-semibold">Tell the reporter what is happening</h3>
         <textarea
           rows={2}
           className="field mt-2 text-sm"
@@ -627,31 +645,32 @@ function Detail({ report, group, suburb, onStatus }: DetailProps) {
             <button
               key={s.id}
               type="button"
-              className="btn-secondary px-2.5 py-1.5 text-xs"
+              className="btn btn-secondary btn-sm"
               onClick={() => onStatus(report.reference, s.id, note)}
             >
               {s.label}
             </button>
           ))}
         </div>
-        <p className="mt-2 text-xs text-council-ink/50">
+        <p className="mt-2 text-xs text-muted">
           The reporter sees this within seconds on their tracking page. That is the whole point.
         </p>
       </div>
 
-      <div className="mt-4 border-t border-council-line pt-4">
-        <h3 className="text-sm font-bold">History</h3>
+      <div className="mt-4 border-t border-grey-200 pt-4">
+        <h3 className="text-base font-semibold">History</h3>
         <ol className="mt-2 space-y-2 text-xs">
           {report.timeline.map((entry, i) => (
             <li key={i} className="flex gap-2">
               <span
+                aria-hidden="true"
                 className="mt-1 h-2 w-2 shrink-0 rounded-full"
                 style={{ background: statusById(entry.status).dot }}
               />
               <div>
                 <p className="font-semibold">{statusById(entry.status).label}</p>
-                {entry.note && <p className="text-council-ink/70">{entry.note}</p>}
-                <p className="text-council-ink/45">
+                {entry.note && <p className="text-grey-600">{entry.note}</p>}
+                <p className="text-muted">
                   {formatWhen(entry.at)} · {entry.by}
                 </p>
               </div>
@@ -666,7 +685,7 @@ function Detail({ report, group, suburb, onStatus }: DetailProps) {
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <>
-      <dt className="font-semibold text-council-ink/60">{label}</dt>
+      <dt className="font-semibold text-muted">{label}</dt>
       <dd>{children}</dd>
     </>
   )

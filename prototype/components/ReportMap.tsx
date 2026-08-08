@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Map as MapLibreMap, NavigationControl } from 'maplibre-gl'
 import type { GeoJSONSource } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { BASEMAP_STYLE, SEVERITY_COLOUR, WELLINGTON_CENTRE, fetchHubs } from '../lib/map'
+import { BASEMAP_STYLE, MAP_COLOUR, SEVERITY_COLOUR, WELLINGTON_CENTRE, fetchHubs } from '../lib/map'
 import {
   PARCEL_MIN_ZOOM,
   emptyCollection,
@@ -147,8 +147,10 @@ export default function ReportMap({
   return (
     <>
       <div ref={containerRef} className="h-full w-full" />
+      {/* Text over a map sits on a solid black capsule — this system has no
+          frosted glass and no protection gradients. */}
       {layers.parcels && zoom < PARCEL_MIN_ZOOM && (
-        <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded bg-council-ink/85 px-3 py-1.5 text-xs font-semibold text-white">
+        <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded bg-wcc-black px-3 py-1.5 text-xs font-semibold text-wcc-white">
           Zoom in to see property boundaries
         </div>
       )}
@@ -172,7 +174,7 @@ function addBoundaryLayers(map: MapLibreMap): void {
     type: 'line',
     source: 'suburbs',
     layout: { visibility: 'none' },
-    paint: { 'line-color': '#123456', 'line-width': 1.4, 'line-opacity': 0.65 },
+    paint: { 'line-color': MAP_COLOUR.boundary, 'line-width': 1.4, 'line-opacity': 0.45 },
   })
   map.addLayer({
     id: 'suburbs-label',
@@ -183,11 +185,11 @@ function addBoundaryLayers(map: MapLibreMap): void {
       'text-field': ['get', 'suburb'],
       'text-size': 12,
       'text-transform': 'uppercase',
-      'text-letter-spacing': 0.05,
+      'text-letter-spacing': 0.04,
     },
     paint: {
-      'text-color': '#123456',
-      'text-halo-color': '#ffffff',
+      'text-color': MAP_COLOUR.boundaryLabel,
+      'text-halo-color': MAP_COLOUR.halo,
       'text-halo-width': 1.6,
     },
   })
@@ -198,7 +200,7 @@ function addBoundaryLayers(map: MapLibreMap): void {
     type: 'line',
     source: 'parcels',
     layout: { visibility: 'none' },
-    paint: { 'line-color': '#6b5f4b', 'line-width': 1, 'line-opacity': 0.9 },
+    paint: { 'line-color': MAP_COLOUR.parcel, 'line-width': 1, 'line-opacity': 0.9 },
   })
 
   map.addSource('hubs', { type: 'geojson', data: emptyCollection() })
@@ -208,11 +210,10 @@ function addBoundaryLayers(map: MapLibreMap): void {
     source: 'hubs',
     layout: { visibility: 'none' },
     paint: {
-      'circle-radius': 4,
-      'circle-color': '#123456',
-      'circle-opacity': 0.5,
-      'circle-stroke-width': 1,
-      'circle-stroke-color': '#ffffff',
+      'circle-radius': 5,
+      'circle-color': MAP_COLOUR.hubFill,
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': MAP_COLOUR.hubStroke,
     },
   })
 }
@@ -228,10 +229,10 @@ function addReportLayers(
     source: 'groups',
     paint: {
       'circle-radius': ['interpolate', ['linear'], ['get', 'count'], 2, 18, 10, 40],
-      'circle-color': '#b3261e',
+      'circle-color': SEVERITY_COLOUR.urgent,
       'circle-opacity': 0.12,
       'circle-stroke-width': 2,
-      'circle-stroke-color': '#b3261e',
+      'circle-stroke-color': SEVERITY_COLOUR.urgent,
       'circle-stroke-opacity': 0.5,
     },
   })
@@ -245,7 +246,7 @@ function addReportLayers(
       'circle-radius': ['case', ['get', 'selected'], 11, 7],
       'circle-color': ['get', 'colour'],
       'circle-stroke-width': ['case', ['get', 'selected'], 3, 1.5],
-      'circle-stroke-color': '#ffffff',
+      'circle-stroke-color': MAP_COLOUR.halo,
     },
   })
 
@@ -352,8 +353,8 @@ function paintReports(
 // Four steps, not a continuous ramp: a duty officer reads "more than five" off a
 // map, not a precise value, and a coarse scale is harder to over-read.
 export function shadeFor(count: number): string {
-  if (count >= 6) return 'rgba(179, 38, 30, 0.34)'
-  if (count >= 3) return 'rgba(217, 119, 6, 0.28)'
-  if (count >= 1) return 'rgba(15, 123, 108, 0.20)'
+  if (count >= 6) return 'rgba(180, 35, 31, 0.32)' // --red-600
+  if (count >= 3) return 'rgba(176, 90, 0, 0.26)' // --orange-600
+  if (count >= 1) return 'rgba(11, 78, 162, 0.18)' // --blue-600
   return 'rgba(0,0,0,0)'
 }

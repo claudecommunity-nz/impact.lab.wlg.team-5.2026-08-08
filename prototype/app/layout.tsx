@@ -1,7 +1,9 @@
 import './globals.css'
 import Link from 'next/link'
-import type { Metadata, Viewport } from 'next'
+import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
+import QuickActions from '../components/QuickActions'
+import { CONTACT_CENTRE } from '../lib/taxonomy'
 
 export const metadata: Metadata = {
   title: 'Report local conditions — Wellington (prototype)',
@@ -14,8 +16,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en-NZ">
       <body>
         <div className="flex min-h-screen flex-col">
-          <PrototypeBanner />
           <SiteHeader />
+          <QuickActions />
+          <PrototypeNotice />
           <main className="flex-1">{children}</main>
           <SiteFooter />
         </div>
@@ -24,69 +27,106 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   )
 }
 
-function PrototypeBanner() {
-  return (
-    <div className="bg-urgent px-4 py-2 text-center text-sm font-semibold text-white">
-      Prototype — not a Council service. Nothing submitted here reaches Wellington City Council.
-      In an emergency call 111.
-    </div>
-  )
-}
-
 function SiteHeader() {
   return (
-    <header className="border-b border-council-line bg-white">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-4">
-        <Link href="/" className="flex items-center gap-3">
-          <span className="grid h-9 w-9 place-items-center rounded bg-council-navy text-sm font-bold text-white">
-            WN
-          </span>
-          <span className="leading-tight">
-            <span className="block text-base font-bold">Report local conditions</span>
-            <span className="block text-xs text-council-ink/60">Wellington City Council · prototype</span>
-          </span>
+    <header className="border-b-rule border-wcc-yellow bg-wcc-white">
+      <div className="mx-auto flex max-w-container flex-wrap items-center justify-between gap-4 px-gutter py-4">
+        <Link href="/" className="block leading-none">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/wcc-logo.svg"
+            alt="Wellington City Council — Me Heke Ki Pōneke"
+            width={250}
+            height={63}
+            className="h-auto w-[200px] sm:w-[250px]"
+          />
         </Link>
-        <nav className="ml-auto flex flex-wrap items-center gap-1 text-sm font-semibold">
-          <NavLink href="/report">Report an issue</NavLink>
-          <NavLink href="/track">Track a report</NavLink>
-          <NavLink href="/wcc">Council console</NavLink>
-        </nav>
+        <p className="text-sm text-muted">
+          Community reporting prototype
+        </p>
       </div>
     </header>
   )
 }
 
-function NavLink({ href, children }: { href: string; children: ReactNode }) {
+// Urgency is stated, not implied. The design system's urgent callout: tinted
+// surface, 4px rule on the top edge, phone number in the copy.
+function PrototypeNotice() {
   return (
-    <Link href={href} className="rounded px-3 py-2 hover:bg-council-sand">
-      {children}
-    </Link>
+    <div role="alert" className="border-t-rule border-error-fg bg-error-bg">
+      <div className="mx-auto max-w-container px-gutter py-3">
+        <p className="font-semibold text-error-fg">
+          Prototype — not a Council service. Nothing submitted here reaches Wellington City Council.
+        </p>
+        <p className="mt-1 max-w-measure text-sm">
+          In an emergency call <strong>111</strong>. For urgent Council matters call{' '}
+          <strong>{CONTACT_CENTRE}</strong>.
+        </p>
+      </div>
+    </div>
   )
 }
 
 function SiteFooter() {
   return (
-    <footer className="border-t border-council-line bg-white">
-      <div className="mx-auto max-w-6xl space-y-2 px-4 py-6 text-sm text-council-ink/70">
-        <p>
-          Built at Impact Lab Wellington, 8 August 2026, for problem statement 02 — a two-way
-          information channel between communities and WCC.
-        </p>
-        <p>
-          Reports here are unverified community observations. Hazard layers shown alongside them are
-          planning data, not live emergency information.
-        </p>
-        <p>
-          Machine-readable feed:{' '}
-          <a className="font-semibold text-council-accent underline" href="/api/feed">
-            /api/feed
-          </a>{' '}
-          (GeoJSON) ·{' '}
-          <a className="font-semibold text-council-accent underline" href="/api/feed?grouped=1">
-            grouped
-          </a>
-        </p>
+    <footer className="border-t-rule border-wcc-yellow bg-wcc-black text-wcc-white">
+      <div className="mx-auto grid max-w-container gap-6 px-gutter py-9 md:grid-cols-3">
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-wcc-white">About this prototype</h2>
+          <p className="text-sm text-grey-300">
+            Built at Impact Lab Wellington, 8 August 2026, for problem statement 02 — a two-way
+            information channel between communities and WCC.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-wcc-white">What you are looking at</h2>
+          <p className="text-sm text-grey-300">
+            Reports here are unverified community observations. Hazard layers shown alongside them
+            are planning data, not live emergency information.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-wcc-white">Machine-readable feed</h2>
+          <ul className="space-y-2 text-sm">
+            <li>
+              <FooterLink href="/api/feed">Every report as GeoJSON</FooterLink>
+            </li>
+            <li>
+              <FooterLink href="/api/feed?grouped=1">Grouped by fault type and proximity</FooterLink>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="border-t border-grey-700">
+        <div className="mx-auto flex max-w-container flex-wrap items-center justify-between gap-4 px-gutter py-4">
+          <p className="text-xs text-grey-300">
+            Interface built with the Wellington City Council design system. Reports are not Council
+            records.
+          </p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/wcc-logo-white.svg"
+            alt="Wellington City Council — Me Heke Ki Pōneke"
+            width={200}
+            height={50}
+            className="h-auto w-[200px]"
+          />
+        </div>
       </div>
     </footer>
+  )
+}
+
+function FooterLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a
+      href={href}
+      className="text-wcc-white underline underline-offset-[3px] transition-colors duration-fast ease-standard hover:text-wcc-yellow"
+    >
+      {children}
+    </a>
   )
 }

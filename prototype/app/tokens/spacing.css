@@ -1,0 +1,23 @@
+:root{
+/* 6px base grid, matching NZ government web practice */
+--space-0:0;
+--space-1:3px;
+--space-2:6px;
+--space-3:12px;
+--space-4:18px;
+--space-5:24px;
+--space-6:36px;
+--space-7:48px;
+--space-8:72px;
+--space-9:96px;
+
+--gutter:var(--space-5);
+--section-y:var(--space-8);
+--field-gap:var(--space-4);
+--stack-gap:var(--space-3);
+
+--measure:66ch;
+--container-max:1200px;
+--container-narrow:720px;
+--tap-min:44px;
+}

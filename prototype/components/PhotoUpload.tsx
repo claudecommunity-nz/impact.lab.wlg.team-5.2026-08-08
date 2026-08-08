@@ -83,7 +83,7 @@ export default function PhotoUpload({ photos, onChange }: PhotoUploadProps) {
   return (
     <div>
       <span className="label">
-        Photos <span className="font-normal text-council-ink/50">(optional, up to {MAX_PHOTOS})</span>
+        Photos <span className="font-normal text-muted">(optional, up to {MAX_PHOTOS})</span>
       </span>
 
       <div
@@ -93,7 +93,7 @@ export default function PhotoUpload({ photos, onChange }: PhotoUploadProps) {
           e.preventDefault()
           handleFiles(e.dataTransfer.files)
         }}
-        className="cursor-pointer rounded border-2 border-dashed border-council-line bg-white p-6 text-center hover:border-council-accent"
+        className="cursor-pointer rounded border-thick border-dashed border-grey-400 bg-wcc-white p-6 text-center transition-colors duration-fast ease-standard hover:border-wcc-black hover:bg-grey-50"
       >
         <p className="font-semibold">
           {busy ? 'Preparing photos…' : 'Drag and drop photos here, or click to select photos'}
@@ -122,12 +122,12 @@ export default function PhotoUpload({ photos, onChange }: PhotoUploadProps) {
               <img
                 src={photo.dataUrl}
                 alt={photo.name}
-                className="h-24 w-24 rounded border border-council-line object-cover"
+                className="h-24 w-24 rounded border border-grey-200 object-cover"
               />
               <button
                 type="button"
                 onClick={() => onChange(photos.filter((p) => p.key !== photo.key))}
-                className="absolute -right-2 -top-2 h-6 w-6 rounded-full bg-council-ink text-sm font-bold text-white"
+                className="absolute -right-2 -top-2 h-7 w-7 rounded-full bg-wcc-black text-sm font-semibold text-wcc-white transition-colors duration-fast ease-standard hover:bg-grey-700"
                 aria-label={`Remove ${photo.name}`}
               >
                 ×

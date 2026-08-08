@@ -49,8 +49,21 @@ export function fetchHubs(): Promise<HubCollection> {
   return hubsPromise
 }
 
+// Design system status colours. MapLibre paint properties take hex, not CSS
+// custom properties, so these are the only place token values are repeated as
+// literals — keep them in step with app/tokens/colors.css.
 export const SEVERITY_COLOUR: Record<SeverityId, string> = {
-  info: '#0f7b6c',
-  disruption: '#d97706',
-  urgent: '#b3261e',
+  info: '#0B4EA2', // --blue-600
+  disruption: '#B05A00', // --orange-600
+  urgent: '#B4231F', // --red-600
 }
+
+// Boundary and basemap furniture, from the same token file.
+export const MAP_COLOUR = {
+  boundary: '#000000', // --wcc-black, drawn at low opacity
+  boundaryLabel: '#2E2E2B', // --grey-700
+  parcel: '#6E6E68', // --grey-500
+  hubFill: '#FFDD00', // --wcc-yellow — a signal, which is what a hub is
+  hubStroke: '#000000', // --wcc-black
+  halo: '#FFFFFF',
+} as const
