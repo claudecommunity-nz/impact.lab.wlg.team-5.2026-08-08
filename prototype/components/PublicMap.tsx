@@ -73,7 +73,7 @@ export default function PublicMap() {
     <div>
       <header>
         <h1 className="max-w-measure text-4xl font-bold tracking-[-0.015em]">
-          What people are reporting
+          Map for Communities
         </h1>
         <span aria-hidden="true" className="rule-yellow mt-4" />
         <p className="mt-4 max-w-measure text-lg">

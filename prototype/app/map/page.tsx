@@ -1,7 +1,7 @@
 import PublicMap from '../../components/PublicMap'
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'What people are reporting — Wellington (prototype)' }
+export const metadata: Metadata = { title: 'Map for Communities — Wellington (prototype)' }
 
 export default function MapPage() {
   return (
