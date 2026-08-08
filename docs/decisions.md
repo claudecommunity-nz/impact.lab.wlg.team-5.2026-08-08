@@ -178,7 +178,7 @@ seed truncating reference tables, not to move the data.
 
 ### 11. Priority is called priority, and never auto-escalates to 1
 
-*8 August 2026* — **in flight**, see [classification.md](classification.md)
+*8 August 2026* — applied, see [classification.md](classification.md)
 
 WCC's "job status" 1–4 is stored as `priority`, published with a
 `priorityBasis`, and a reporter marking something urgent lifts the category
@@ -190,5 +190,58 @@ a human has to decide.
 
 ---
 
-**Verified against:** `supabase/migrations/20260808000001`–`20260808000014` —
-8 August 2026.
+### 12. Merged categories retire as aliases, never as deletions
+
+*8 August 2026* — `20260808000015`
+
+Three pairs were merged: `flooding`+`coastal` → `surface-flood`,
+`road-blocked`+`access-cut` → `road-closure`, `power-out`+`water-out` →
+`service-outage`. The six old codes keep their rows, go `is_active = false`, and
+point at the new one through `superseded_by`. `gold.submit_report` resolves the
+pointer and tells the caller via `faultTypeRemapped`.
+
+**Why:** someone standing in front of water coming over a sea wall onto a road
+should not have to decide whether that is "flooding" or "coastal inundation"
+before they can tell anyone. Fewer, clearer boxes mean more reports and fewer
+miscategorised ones.
+
+**Why aliases rather than deletion:** deleting the codes would have broken every
+client built against the old list, on the one day nobody has time to fix them —
+including our own form, which still sends them. A merge that breaks integrations
+is a merge nobody dares run.
+
+Three things the merge would have quietly lost, each handled rather than
+absorbed: the stricter location precision is inherited, not the looser one;
+`service-outage` routes to no agency rather than confidently sending every burst
+main to the power company; and `surface-flood` keeps `wcc_lead` for the common
+case while carrying the WCC/GWRC coastal split in its `ownership_note`.
+
+---
+
+### 13. Scope drift is published, not enforced
+
+*8 August 2026* — `20260808000016`
+
+WCC named six categories it leads and four it shares. That is recorded as data in
+`silver.wcc_scope` and compared against the live classification by
+`gold.scope_audit`, which is readable by `anon`. It is **not** a constraint.
+
+**Why not a constraint:** during a build the classification is still moving, and
+a constraint that blocks a legitimate edit gets dropped rather than obeyed —
+which loses the check entirely. A view that says "this category claims WCC lead
+but is not in WCC's stated scope" survives being ignored.
+
+**Why it matters:** a seventh category appearing later with `wcc_lead` on it
+would put Council's name against a job Council never accepted, and nothing would
+have noticed. The audit is restricted to `service = 'emergency'` for the same
+reason — auditing potholes and graffiti produces thirty rows of noise that trains
+everyone to ignore the four that matter.
+
+This is the same principle as `priorityBasis` and `verificationLevel`: where the
+system is uncertain or inferring, it says so rather than presenting a clean
+answer.
+
+---
+
+**Verified against:** `supabase/migrations/20260808000001`–`20260808000017` —
+8 August 2026. `20260808000015`–`20260808000017` read from source, not applied.

@@ -124,14 +124,15 @@ the publisher, the endpoint and a plain refusal rather than an empty
 
 ## In flight
 
-- **Setting ownership and priority through the API.** Both are published by
-  `gold` but can only be changed inside `silver`; there is no triage endpoint
-  yet. See [classification.md](classification.md).
 - **Rate limiting on `submit_report`.** Anyone may file a report, which is the
   point of a public channel, but nothing throttles it.
+- **Nothing calls `gold.triage_report`.** The endpoint landed in
+  `20260808000016` — ownership and priority can now be set through the API,
+  service role only — but no console reads or writes the database at all. See
+  [workflow-gaps.md](workflow-gaps.md).
 
 ---
 
-**Verified against:** `supabase/migrations/20260808000001`–`20260808000014`,
+**Verified against:** `supabase/migrations/20260808000001`–`20260808000017`,
 `supabase/config.toml`, `supabase/seed.sql` header, `prototype/` file listing —
-8 August 2026.
+8 August 2026. Migrations `0015`–`0017` read from source, not applied.

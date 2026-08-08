@@ -52,6 +52,14 @@ Two supporting rules:
 - **Cluster centroids are always `zone_100m`**, regardless of the fault type
   underneath. An aggregate of urgent reports should not be more locatable than
   the reports it aggregates.
+- **Precision is never relaxed retroactively.** When `20260808000015` merged
+  `access-cut` (published at `zone_100m`) into `road-closure` (`street`), a naive
+  remap would have republished already-filed reports about households with no
+  vehicle access at street precision — a privacy downgrade applied to people who
+  had already reported and could not consent to it. The migration backfills
+  `precision_override = 'zone_100m'` on those rows *before* its own remap, and
+  `gold.submit_report` does the same for a report arriving under the old code. A
+  merged category inherits the **stricter** of the two precisions.
 
 Fuzzing snaps to the **centre** of an NZTM2000 grid cell — deterministic and
 irreversible. See [data-model.md](data-model.md#location-fuzzing).
@@ -91,12 +99,17 @@ ArcGIS Online drops file-level GeoJSON metadata — see [api.md](api.md).
 
 ## Some things are refused, not absorbed
 
-> ⚠️ **This is currently not true in the database.** Verified 8 August 2026:
-> submitting `assistance` as `anon` succeeded and returned a reference.
-> `intake_blocked` is `false` for every fault type, because reference data moved
-> from `seed.sql` into migration `0009`, which does not carry the column. The
-> guard in `submit_report()` is intact and has nothing to fire on. See
-> [workflow-gaps.md](workflow-gaps.md#2-life-safety-intake-blocking-is-currently-off--regression).
+> **Fixed in `20260808000011`.** This section briefly described something that
+> was not true: `intake_blocked` was `false` for every category, because
+> reference data moved from `seed.sql` into migration `0009`, which did not carry
+> the column — so submitting `assistance` as `anon` returned a reference and "it
+> is in the queue to be looked at". The guard in `submit_report()` was intact and
+> had nothing to fire on. `0011` sets the flag on `assistance` and
+> `building-damage` with reasons that tell the reporter to call 111.
+>
+> Recorded rather than deleted because it is the sharpest example of why these
+> docs distinguish read from run: the guard was written, reviewed and documented,
+> and was off in the database for as long as nobody executed it.
 
 `fault_type.intake_blocked` mirrors `CALL_111` and `CALL_CONTACT_CENTRE` in
 `prototype/lib/taxonomy.ts`, and `gold.submit_report()` raises rather than
@@ -127,5 +140,6 @@ rows rather than living in a comment.
 
 ---
 
-**Verified against:** `supabase/migrations/20260808000003`–`20260808000014`,
+**Verified against:** `supabase/migrations/20260808000003`–`20260808000017`,
 `supabase/seed.sql` header, `prototype/lib/taxonomy.ts` — 8 August 2026.
+Migrations `0015`–`0017` read from source, not applied.
