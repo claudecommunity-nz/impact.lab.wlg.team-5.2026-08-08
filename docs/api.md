@@ -94,6 +94,48 @@ anything:
 | `disclaimer` | Rides on the row so a consumer who never read these docs still cannot present it as confirmed fact |
 | `address` | **Null unless precision is `street`.** "Rawhiti Terrace" plus a 100m cell reassembles the exact address the fuzzing was meant to protect |
 
+### `gold.dataset_catalogue` → the 74 WCC datasets
+
+`GET /rest/v1/dataset_catalogue`
+
+Every hazard and infrastructure layer WCC Emergency Management published, with
+its publisher, licence, endpoint and — the useful column — `availableVia`:
+
+| `availableVia` | Meaning |
+|---|---|
+| `gold.layer_geojson` | Mirrored **and** licence-cleared. Ask us. |
+| `publisher_endpoint` | Catalogued only. Go to `endpointUrl`. |
+| `publisher_image_service` | A raster. Ask it for a PNG, not features. |
+
+`lastFetchedAt`, `lastFeatureCount`, `lastFetchComplete` and `lastFetchError`
+come from the provenance log. A layer we could not reach says so, rather than
+appearing empty — `fault-hazard-overlay` currently carries
+`"Invalid or missing input parameters."`, which is the truth.
+
+### `gold.layer_geojson(dataset_id, bbox, max_features)` → `FeatureCollection`
+
+`POST /rest/v1/rpc/layer_geojson`
+
+Returns a mirrored layer with full provenance in `metadata`, including
+`complete`, `truncated` and a `generalisation` note (simplified to ~5m for web
+display — do not measure anything with our copy).
+
+**It refuses when the licence is not cleared**, with a 200 and an explanation:
+
+```json
+{ "error": "not_redistributable",
+  "publisher": "Wellington City Council",
+  "licence": "not stated",
+  "endpointUrl": "https://gis.wcc.govt.nz/...",
+  "message": "This dataset's licence does not clear us to republish it…" }
+```
+
+Only one dataset of the 74 carries any licence note at all. Unstated is not
+permission, so exactly one layer — `community-emergency-hubs`, which is GWRC
+open data already exported into this repo — is cleared. Everything else is
+mirrored into `silver` for our own spatial joins and refused by the public API.
+Adding to that list is a licence decision, made in `scripts/ingest-gis.mjs`.
+
 ## Writing
 
 ### `gold.submit_report(...)` → `jsonb`

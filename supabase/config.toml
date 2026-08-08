@@ -78,7 +78,14 @@ schema_paths = []
 enabled = true
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+# Order matters. seed.sql carries the hubs and the reports; gis-ingest.sql
+# carries the 74-dataset catalogue and the mirrored hazard layers. Both are
+# generated and committed, so `supabase db reset` rebuilds the whole database
+# without touching the network — which matters on hackathon wifi, and matters
+# more when the council servers are the thing that is slow.
+#
+# Regenerate with: npm run seed:build && npm run gis:fetch
+sql_paths = ["./seed.sql", "./gis-ingest.sql"]
 
 [db.network_restrictions]
 # Enable management of network restrictions.
