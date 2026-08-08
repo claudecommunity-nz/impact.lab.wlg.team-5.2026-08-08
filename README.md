@@ -4,6 +4,8 @@
 Saturday 8 August 2026 · Waimanga Room, Wellington City Council
 
 📊 **[Presentation deck](https://docs.google.com/presentation/d/1y97zDl2mwJnpQQqIXr4hBfJjDARNlMVSmTiF4cvz4Sc/edit?usp=sharing)**
+🎥 **[Video demo](video_demo/demo.mov)** — a 1:31 walkthrough: filing a report through
+the form, then tracking it by reference number and watching the status trail.
 
 ---
 
