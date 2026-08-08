@@ -46,6 +46,17 @@ export const STATUSES: StatusDefinition[] = [
     tone: 'bg-warning-bg text-warning-fg border-warning-bg',
     dot: '#B05A00', // --orange-600
   },
+  // Black, not a functional colour. The four functional colours all mean "how
+  // far along is this"; verified answers a different question — is it true —
+  // and the strongest mark in the design system is the right weight for the one
+  // status on this board that came from someone standing in the street.
+  {
+    id: 'verified',
+    label: 'Verified',
+    residentText: 'A first responder has confirmed this on the ground.',
+    tone: 'bg-wcc-black text-wcc-white border-wcc-black',
+    dot: '#000000', // --wcc-black
+  },
   {
     id: 'acting',
     label: 'Being acted on',
@@ -71,6 +82,37 @@ export const STATUSES: StatusDefinition[] = [
 
 export function statusById(id: string | null | undefined): StatusDefinition {
   return STATUSES.find((s) => s.id === id) || STATUSES[0]
+}
+
+// Who can verify a report, and who therefore ends up named on it.
+//
+// The list is short and closed on purpose. "Verified" is the claim this whole
+// prototype leans hardest on — it is what turns an unverified public post into
+// something the Council is willing to publish — so it has to carry the name of
+// the organisation that made the call. A free-text box would let it be set by
+// nobody in particular, which is the same as not verifying it.
+export interface Verifier {
+  id: string
+  label: string
+  /** Written into the timeline, so the resident sees who confirmed it. */
+  by: string
+  /** `silver.agency.code` upstream. gold.confirm_report resolves the name from it. */
+  agencyCode: string
+}
+
+export const VERIFIERS: Verifier[] = [
+  { id: 'fenz', label: 'Fire', by: 'Fire and Emergency New Zealand', agencyCode: 'FENZ' },
+  { id: 'police', label: 'Police', by: 'New Zealand Police', agencyCode: 'POLICE' },
+  { id: 'wcc', label: 'Council crew', by: 'WCC Emergency Management', agencyCode: 'WCC' },
+]
+
+/** The verifier a timeline entry names, or null if it was not one of ours. */
+export function verifierByName(by: string | null | undefined): Verifier | null {
+  return VERIFIERS.find((v) => v.by === by) || null
+}
+
+export function verifierById(id: string | null | undefined): Verifier | null {
+  return VERIFIERS.find((v) => v.id === id) || null
 }
 
 export const REPORTER_KINDS: { id: ReporterKindId; label: string }[] = [
@@ -178,5 +220,8 @@ export function normalise(
         by: 'system',
       },
     ],
+    publishedAt: null,
+    publishError: null,
+    publishedReference: null,
   }
 }

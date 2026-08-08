@@ -7,7 +7,7 @@
 // somebody else's CORS policy changing.
 
 import { NextResponse } from 'next/server'
-import { groupReports } from '../../../lib/store'
+import { fixClaimsByReference, groupReports } from '../../../lib/store'
 import { fetchPublicReports, toReport } from '../../../lib/publicFeed'
 
 export const dynamic = 'force-dynamic'
@@ -28,5 +28,9 @@ export async function GET() {
     reports: local,
     details: reports,
     groups: groupReports(local),
+    // "I fixed it" taps made from this page. They are ours, not the feed's —
+    // the feed is read-only — so they are returned alongside rather than merged
+    // into the reports, which would make them look like the publisher's data.
+    claims: fixClaimsByReference(),
   })
 }

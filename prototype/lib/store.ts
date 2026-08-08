@@ -3,20 +3,42 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import { makeReference, normalise } from './schema'
+import { REPORTER_KINDS, makeReference, normalise } from './schema'
 import { seedReports } from './seed'
-import type { Report, ReportGroup, ReportInput, StatusId } from './types'
+import type { FixClaim, Report, ReportGroup, ReportInput, ReporterKindId, StatusId } from './types'
 
 const DATA_DIR = path.join(process.cwd(), '.data')
 const DATA_FILE = path.join(DATA_DIR, 'reports.json')
+const CLAIMS_FILE = path.join(DATA_DIR, 'fix-claims.json')
 
 function read(): Report[] {
   try {
-    return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'))
+    return (JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')) as Report[]).map(hydrate)
   } catch {
     const seeded = seedReports()
     write(seeded)
     return seeded
+  }
+}
+
+// A `.data/reports.json` written before the publish fields existed is still a
+// perfectly good file, and deleting the demo data on upgrade is a worse answer
+// than filling in the gaps. Undefined and null are different here: undefined
+// means the field predates the feature, null means never published.
+function hydrate(report: Report): Report {
+  const stored = report as Partial<Report>
+  if (
+    stored.publishedAt !== undefined &&
+    stored.publishError !== undefined &&
+    stored.publishedReference !== undefined
+  ) {
+    return report
+  }
+  return {
+    ...report,
+    publishedAt: stored.publishedAt ?? null,
+    publishError: stored.publishError ?? null,
+    publishedReference: stored.publishedReference ?? null,
   }
 }
 
@@ -68,7 +90,133 @@ export function updateStatus(
 export function resetToSeed(): Report[] {
   const seeded = seedReports()
   write(seeded)
+  writeClaims([])
   return seeded
+}
+
+// --- publishing ------------------------------------------------------------
+
+/** Records the outcome of a push to the shared feed, successful or not. */
+export function markPublished(
+  reference: string,
+  {
+    at,
+    error,
+    publishedReference = null,
+  }: { at: string | null; error: string | null; publishedReference?: string | null },
+): Report | null {
+  const reports = read()
+  const report = reports.find((r) => r.reference.toUpperCase() === String(reference).toUpperCase())
+  if (!report) return null
+
+  report.publishedAt = at
+  report.publishError = error
+  // Only on success. A failed attempt must not overwrite the reference of an
+  // earlier one that worked — that link is the only way back to the upstream
+  // record, and losing it would orphan a report already on the feed.
+  if (at && publishedReference) report.publishedReference = publishedReference
+
+  if (at) {
+    report.timeline.push({
+      at,
+      status: report.status,
+      note: publishedReference
+        ? `Published to the shared reports feed as confirmed data, as ${publishedReference}.`
+        : 'Published to the shared reports feed as confirmed data.',
+      by: 'WCC Emergency Management',
+    })
+  }
+  write(reports)
+  return report
+}
+
+// --- fix claims ------------------------------------------------------------
+//
+// "I fixed it" from a member of the public. Stored beside the reports rather
+// than on them, because a claim can be made against a report on the shared feed
+// that this prototype does not own.
+
+function readClaims(): FixClaim[] {
+  try {
+    return JSON.parse(fs.readFileSync(CLAIMS_FILE, 'utf8'))
+  } catch {
+    return []
+  }
+}
+
+function writeClaims(claims: FixClaim[]): void {
+  fs.mkdirSync(DATA_DIR, { recursive: true })
+  fs.writeFileSync(CLAIMS_FILE, JSON.stringify(claims, null, 2))
+}
+
+export function listFixClaims(): FixClaim[] {
+  return readClaims().sort((a, b) => b.at.localeCompare(a.at))
+}
+
+/** Claims by reference, for a console or a map that has reports in hand. */
+export function fixClaimsByReference(): Record<string, FixClaim> {
+  const byReference: Record<string, FixClaim> = {}
+  // Newest first, so the first one seen for a reference is the one that stands.
+  for (const claim of listFixClaims()) {
+    if (!byReference[claim.reference]) byReference[claim.reference] = claim
+  }
+  return byReference
+}
+
+export function claimFixed(
+  reference: string,
+  { note, by = 'resident' }: { note?: string | null; by?: ReporterKindId } = {},
+): FixClaim {
+  const upper = String(reference).toUpperCase()
+  const now = new Date().toISOString()
+
+  // One row per reference, counted. A queue that grows a line every time
+  // somebody taps the button is a queue an operator stops reading, but the
+  // number of people saying it is information and must not be thrown away.
+  const others = readClaims().filter((c) => c.reference !== upper)
+  const previous = readClaims().find((c) => c.reference === upper) || null
+
+  const claim: FixClaim = {
+    reference: upper,
+    at: now,
+    // Keep the newest words. Somebody adding detail an hour later is usually
+    // describing what actually happened, not repeating the first person.
+    note: note || previous?.note || null,
+    by,
+    source: getReport(upper) ? 'local' : 'feed',
+    count: (previous?.count || 0) + 1,
+    firstAt: previous?.firstAt || now,
+  }
+  writeClaims([...others, claim])
+
+  // A claim is not a status, so nothing here touches `status`. It goes on the
+  // report's timeline because the resident should see that it landed, and it
+  // names who said it — the console renders it as unverified either way.
+  const report = getReport(upper)
+  if (report) {
+    const reports = read()
+    const stored = reports.find((r) => r.reference === report.reference)
+    if (stored) {
+      // Named for who said it. A hub team saying a road is clear and one
+      // household saying so are not the same weight of information, and a
+      // timeline that flattens both to "a member of the public" throws away the
+      // part a duty officer would use to decide.
+      const who = REPORTER_KINDS.find((k) => k.id === claim.by)?.label || 'A member of the public'
+      const said = claim.note ? `: “${claim.note}”` : ''
+      stored.timeline.push({
+        at: now,
+        status: stored.status,
+        note:
+          claim.count > 1
+            ? `Also reported as fixed${said}. ${claim.count} people have now said so. Not yet verified.`
+            : `Reported as fixed${said}. Not yet verified.`,
+        by: who,
+      })
+      write(reports)
+    }
+  }
+
+  return claim
 }
 
 // --- grouping -------------------------------------------------------------

@@ -17,11 +17,15 @@ The store seeds itself with demo reports on first run. `rm -rf .data` resets it.
 | Route | Who it is for |
 |---|---|
 | `/report` | Resident, community group or hub files a report. Five steps: what, where, details, you, done. |
-| `/track` | Resident enters their reference number and watches the status change. |
-| `/wcc` | Council duty officer: queue, map, grouping, and the control that sets a status. |
+| `/track` | Resident enters their reference number, watches the status change, and can say it is fixed. |
+| `/map` | The shared feed beside the Council's published map. Read-only, except "I fixed it". |
+| `/wcc` | Council duty officer: queue, map, grouping, status, verification and publishing. |
 
 Open `/wcc` and `/track` side by side — changing a status in the console appears
-on the resident's page within about five seconds. That is the demo.
+on the resident's page within about five seconds. That is the demo. The longer
+version runs the loop the other way: tap **I fixed it** on `/track`, watch the
+claim land in the console, verify it as Fire, and the resident sees who
+confirmed it.
 
 ## What this is a clone of, and what it adds
 
@@ -86,6 +90,83 @@ What the current channel has no concept of, and this adds:
   physically been there.
 - **Grouping.** Reports of the same fault type within 250m are clustered, so
   forty messages about one storm become a handful of things to act on.
+- **A return leg — "I fixed it".** The community can close the loop, not only
+  open it. See below.
+- **Verification, with a name on it.** A status that says who confirmed it.
+
+## The fix-and-verify loop
+
+The two-way channel is only two-way if information can come back the other way
+at the end as well as the start. A neighbour clears the drain, a hub team moves
+the branch, a contractor finishes before anyone at the Council has looked —
+today none of that reaches the Council, so the report stays open and the map
+keeps showing a problem that is not there.
+
+```
+resident taps "I fixed it"   →   duty officer sees a claim   →   Fire or Police
+        (/track, /map)                    (/wcc)                   confirm it
+                                                                       ↓
+                                              published to the shared feed  ←  Verified
+```
+
+Three rules hold it together, and they are the point of it:
+
+- **A claim never moves a status.** An unverified claim that a hazard is gone is
+  the most dangerous thing this prototype could treat as fact — it is the one
+  that takes a warning off a map. The button files a claim, the console renders
+  it as a claim (outlined, never filled like a Council status), and only
+  verification moves anything.
+- **Repeat claims are counted, not repeated.** Four neighbours saying a road is
+  clear is better evidence than one, and it is the same reasoning as grouping by
+  proximity. The queue keeps one row and a count.
+- **Verified names an organisation.** `VERIFIERS` in `lib/schema.ts` is a short
+  closed list — Fire, Police, Council crew — and the API refuses a `verified`
+  status with no verifier. A confirmation from nobody in particular is not a
+  confirmation. The resident sees the name on their tracking page.
+
+`/map` offers the button against reports on the shared feed too. That feed is
+read-only, so the claim lands in this console rather than back on the feed, and
+the form says so rather than implying it went somewhere it did not.
+
+## Publishing to the shared feed
+
+`Publish` in the console pushes a verified report onto the shared Supabase feed
+(`supabase/`), so the other teams get a set where everything was confirmed by
+someone who was there. Guarded on `verified`, and it sends no contact details.
+
+It is two RPC calls, in this order:
+
+| Call | Who may | What it does |
+|---|---|---|
+| `gold.submit_report` | anon | The only write path into `silver`. Validates fault type, service, bounds and severity, and **mints its own reference** |
+| `gold.confirm_report` | service role only | Raises `verification_level` to `field_confirmed` and names the agency |
+
+The second call is the point. Without it the report lands as `unverified` with a
+disclaimer saying so, which is worse than not publishing — it adds noise to a
+feed whose only value is that it is checked. `gold.confirm_report` is added by
+[`20260808000015_confirm_report.sql`](../supabase/migrations/20260808000015_confirm_report.sql):
+`silver.verification_level` and `gold.disclaimer_for` existed from the start, but
+nothing could set a level above `corroborated`, so `field_confirmed` was
+unreachable.
+
+Because `submit_report` generates its own reference, the upstream record is a
+**different report** from ours. `publishedReference` keeps the link, and the
+console says so rather than implying the two are one record.
+
+Config, both already in `.env.example`:
+
+```
+NEXT_PUBLIC_SUPABASE_URL     the project URL
+SUPABASE_SERVICE_ROLE_KEY    server-side only, never in .env.example
+```
+
+Confirming is deliberately refused to the anon key, for the same reason
+`gold.advance_status` is: "Fire have confirmed this" is a statement about the
+world, and a key that ships in a browser bundle must not be able to make it.
+
+Failures are stored on the report and shown in full, quoting the Postgres error
+and code. A publish button that quietly does nothing is worse than one that does
+not work, because the operator would believe the data went out.
 
 ## Map layers
 
@@ -122,11 +203,13 @@ otherwise looks exactly like a suburb with no properties in it.
 CORS is open, so another team's map can read these directly.
 
 ```
-GET /api/feed              GeoJSON, one point per report
-GET /api/feed?grouped=1    one point per inferred group
-GET /api/reports           full records plus grouping
-POST /api/reports          file a report
-PATCH /api/reports/:ref    set status  {status, note}
+GET /api/feed                    GeoJSON, one point per report
+GET /api/feed?grouped=1          one point per inferred group
+GET /api/reports                 full records, grouping, and fix claims
+POST /api/reports                file a report
+PATCH /api/reports/:ref          set status  {status, note, verifier}
+POST /api/reports/:ref/fix       "I fixed it"  {note, by}
+POST /api/reports/:ref/publish   push a verified report to the shared feed
 ```
 
 Every feed response carries a `metadata.disclaimer` saying the reports are
@@ -145,6 +228,12 @@ that through.
 - The status rail shows steps that have *not* happened. "Received" with nothing
   after it for two days is information, and hiding it is what makes the current
   channel feel like a void.
+- A fix claimed by the public is shown as a claim, never as a resolution, and it
+  cannot move a status on its own.
+- `Verified` carries the name of the organisation that confirmed it, everywhere
+  it appears. Without a name it is not a claim anyone can check.
+- A failed publish is shown with the server's own error, on the report. Nothing
+  is reported as published unless it was.
 
 ## Layout
 
@@ -154,19 +243,26 @@ app/
   report/ track/ wcc/          the three screens
   api/reports/                 GET list, POST create
   api/reports/[reference]/     GET one, PATCH status
+    fix/                       POST "I fixed it"
+    publish/                   POST to the shared feed
   api/feed/                    GeoJSON out
+  api/public-feed/             the shared Supabase feed, read
 components/
   Wizard.tsx PhotoUpload.tsx MapPicker.tsx   resident side
   Console.tsx ReportMap.tsx                  council side
   Tracker.tsx                                the acknowledgement loop
+  FixedIt.tsx                                the return leg, on /track and /map
+  PublicMap.tsx                              the shared feed beside WCC's map
 lib/
-  types.ts     Report, statuses, severities, map layer types — the one contract
+  types.ts     Report, FixClaim, statuses, map layer types — the one contract
   layers.ts    suburb + parcel boundaries, and point-in-polygon
   taxonomy.ts  services and fault types
-  schema.ts    report shape, statuses, validation
-  store.ts     JSON-file store and the grouping heuristic
+  schema.ts    report shape, statuses, verifiers, validation
+  store.ts     JSON-file store, grouping heuristic, fix claims
   seed.ts      demo reports at real Wellington locations
   map.ts       basemap, and WREMO's 126 Community Emergency Hubs
+  publicFeed.ts  reading the shared feed
+  publish.ts     writing back to it
 scripts/
   check-map.mjs  browser check that the map layers actually render
 ```

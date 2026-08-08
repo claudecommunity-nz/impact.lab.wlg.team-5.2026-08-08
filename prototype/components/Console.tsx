@@ -3,14 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import ReportMap, { shadeFor } from './ReportMap'
-import { STATUSES, statusById } from '../lib/schema'
+import { REPORTER_KINDS, STATUSES, VERIFIERS, statusById } from '../lib/schema'
 import { SEVERITY_COLOUR } from '../lib/map'
 import { SERVICES, faultLabel } from '../lib/taxonomy'
 import { formatWhen, relativeWhen } from '../lib/time'
 import { countBySuburb, emptyCollection, suburbAt } from '../lib/layers'
 import type { SuburbCollection } from '../lib/layers'
+import type { PublishTarget } from '../lib/publish'
 import type {
   BoundaryLayerToggles,
+  FixClaim,
   ParcelStatus as ParcelStatusValue,
   Report,
   ReportGroup,
@@ -18,18 +20,24 @@ import type {
   StatusId,
 } from '../lib/types'
 
-type QueueFilter = 'open' | 'urgent' | 'hub' | 'all'
+type QueueFilter = 'open' | 'urgent' | 'hub' | 'fixed' | 'all'
 
 const SEVERITY_LABEL: Record<SeverityId, string> = {
   info: 'Info',
   disruption: 'Disruption',
   urgent: 'Urgent',
 }
-const OPEN_STATUSES: StatusId[] = ['received', 'checking', 'acting']
+
+// Verified is open. A confirmed hazard is not a dealt-with hazard, and dropping
+// it out of the queue the moment somebody vouches for it is how a real problem
+// stops being anyone's job.
+const OPEN_STATUSES: StatusId[] = ['received', 'checking', 'verified', 'acting']
 
 export default function Console() {
   const [reports, setReports] = useState<Report[]>([])
   const [groups, setGroups] = useState<ReportGroup[]>([])
+  const [claims, setClaims] = useState<Record<string, FixClaim>>({})
+  const [target, setTarget] = useState<PublishTarget | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [filter, setFilter] = useState<QueueFilter>('open')
   const [service, setService] = useState('all')
@@ -49,6 +57,8 @@ export default function Console() {
     const data = await res.json()
     setReports(data.reports)
     setGroups(data.groups)
+    setClaims(data.claims || {})
+    setTarget(data.publishTarget || null)
     setLoadedAt(new Date())
   }, [])
 
@@ -64,9 +74,10 @@ export default function Console() {
       if (filter === 'open') return OPEN_STATUSES.includes(r.status)
       if (filter === 'urgent') return r.severity === 'urgent' && OPEN_STATUSES.includes(r.status)
       if (filter === 'hub') return r.reporterKind === 'hub'
+      if (filter === 'fixed') return Boolean(claims[r.reference])
       return true
     })
-  }, [reports, filter, service])
+  }, [reports, filter, service, claims])
 
   const visibleGroups = useMemo(() => {
     const refs = new Set(visible.map((r) => r.reference))
@@ -90,22 +101,35 @@ export default function Console() {
     ? groups.find((g) => g.reports.some((r) => r.reference === selectedReport.reference))
     : null
 
-  async function setStatus(reference: string, status: StatusId, note: string): Promise<void> {
+  async function setStatus(
+    reference: string,
+    status: StatusId,
+    note: string,
+    verifier?: string,
+  ): Promise<void> {
     await fetch(`/api/reports/${reference}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, note }),
+      body: JSON.stringify({ status, note, verifier }),
     })
+    load()
+  }
+
+  async function publish(reference: string): Promise<void> {
+    // The outcome is recorded on the report either way, so reloading is enough
+    // to show it — including the failure, which is the case that matters.
+    await fetch(`/api/reports/${reference}/publish`, { method: 'POST' })
     load()
   }
 
   return (
     <div>
-      <Header reports={reports} loadedAt={loadedAt} />
+      <Header reports={reports} claims={claims} loadedAt={loadedAt} />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[22rem_1fr_24rem]">
         <Queue
           groups={visibleGroups}
+          claims={claims}
           selected={selected}
           onSelect={setSelected}
           filter={filter}
@@ -140,18 +164,31 @@ export default function Console() {
           report={selectedReport}
           group={selectedGroup}
           suburb={selectedSuburb}
+          claim={selectedReport ? claims[selectedReport.reference] || null : null}
+          target={target}
           onStatus={setStatus}
+          onPublish={publish}
         />
       </div>
     </div>
   )
 }
 
-function Header({ reports, loadedAt }: { reports: Report[]; loadedAt: Date | null }) {
+function Header({
+  reports,
+  claims,
+  loadedAt,
+}: {
+  reports: Report[]
+  claims: Record<string, FixClaim>
+  loadedAt: Date | null
+}) {
   const open = reports.filter((r) => OPEN_STATUSES.includes(r.status))
   const urgent = open.filter((r) => r.severity === 'urgent')
   const unacknowledged = open.filter((r) => r.status === 'received')
   const hubs = reports.filter((r) => r.reporterKind === 'hub')
+  const claimed = open.filter((r) => claims[r.reference])
+  const published = reports.filter((r) => r.publishedAt)
 
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
@@ -168,6 +205,8 @@ function Header({ reports, loadedAt }: { reports: Report[]; loadedAt: Date | nul
         <Stat label="Urgent" value={urgent.length} tone="text-error-fg" />
         <Stat label="Not yet actioned" value={unacknowledged.length} />
         <Stat label="From hubs" value={hubs.length} />
+        <Stat label="Said to be fixed" value={claimed.length} />
+        <Stat label="Published" value={published.length} />
       </div>
       {loadedAt && (
         <p className="w-full text-xs text-muted">
@@ -189,6 +228,7 @@ function Stat({ label, value, tone = '' }: { label: string; value: number; tone?
 
 interface QueueProps {
   groups: ReportGroup[]
+  claims: Record<string, FixClaim>
   selected: string | null
   onSelect: (reference: string) => void
   filter: QueueFilter
@@ -201,6 +241,7 @@ interface QueueProps {
 
 function Queue({
   groups,
+  claims,
   selected,
   onSelect,
   filter,
@@ -222,6 +263,7 @@ function Queue({
             ['open', 'Open'],
             ['urgent', 'Urgent'],
             ['hub', 'Hubs'],
+            ['fixed', 'Said fixed'],
             ['all', 'All'],
           ] as [QueueFilter, string][]).map(([id, label]) => (
             <button
@@ -266,7 +308,7 @@ function Queue({
       <ol className="flex-1 divide-y divide-grey-200 overflow-y-auto">
         {groups.map((group) => (
           <li key={group.key}>
-            <GroupRow group={group} selected={selected} onSelect={onSelect} />
+            <GroupRow group={group} claims={claims} selected={selected} onSelect={onSelect} />
           </li>
         ))}
         {!groups.length && <li className="p-6 text-center hint">Nothing matches that filter.</li>}
@@ -277,10 +319,12 @@ function Queue({
 
 function GroupRow({
   group,
+  claims,
   selected,
   onSelect,
 }: {
   group: ReportGroup
+  claims: Record<string, FixClaim>
   selected: string | null
   onSelect: (reference: string) => void
 }) {
@@ -342,6 +386,8 @@ function GroupRow({
                   {SEVERITY_LABEL[r.severity]}
                 </Tag>
                 {r.reporterKind === 'hub' && <Tag tone="hub">Hub</Tag>}
+                {claims[r.reference] && <Tag tone="claim">Said fixed</Tag>}
+                {r.publishedAt && <Tag tone="published">Published</Tag>}
                 {r.attachmentUploadKeys.length > 0 && <Tag>{r.attachmentUploadKeys.length} photo</Tag>}
               </span>
             </button>
@@ -359,6 +405,10 @@ function Tag({ children, tone }: { children: ReactNode; tone?: string }) {
     disruption: 'bg-warning-bg text-warning-fg',
     info: 'bg-grey-100 text-grey-700',
     hub: 'bg-wcc-yellow text-wcc-black',
+    // Outlined rather than filled — a claim from the public is not a status the
+    // Council set, and the queue should not let the two read the same.
+    claim: 'border border-wcc-black bg-wcc-white text-wcc-black',
+    published: 'bg-wcc-black text-wcc-white',
   }
   return (
     <span
@@ -536,10 +586,13 @@ interface DetailProps {
   report: Report | null
   group: ReportGroup | null | undefined
   suburb: string | null
-  onStatus: (reference: string, status: StatusId, note: string) => void
+  claim: FixClaim | null
+  target: PublishTarget | null
+  onStatus: (reference: string, status: StatusId, note: string, verifier?: string) => void
+  onPublish: (reference: string) => void
 }
 
-function Detail({ report, group, suburb, onStatus }: DetailProps) {
+function Detail({ report, group, suburb, claim, target, onStatus, onPublish }: DetailProps) {
   const [note, setNote] = useState('')
 
   useEffect(() => setNote(''), [report?.reference])
@@ -563,12 +616,21 @@ function Detail({ report, group, suburb, onStatus }: DetailProps) {
             {faultLabel(report.service, report.faultType)}
           </h2>
         </div>
-        <span
-          className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.04em] ${status.tone}`}
-        >
-          {status.label}
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span
+            className={`rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.04em] ${status.tone}`}
+          >
+            {status.label}
+          </span>
+          {report.publishedAt && (
+            <span className="rounded-full border border-wcc-black bg-wcc-black px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.04em] text-wcc-white">
+              Published
+            </span>
+          )}
+        </div>
       </div>
+
+      {claim && <FixClaimNotice claim={claim} status={report.status} />}
 
       <p className="mt-3 whitespace-pre-wrap text-sm">{report.faultDesc}</p>
 
@@ -641,7 +703,9 @@ function Detail({ report, group, suburb, onStatus }: DetailProps) {
           onChange={(e) => setNote(e.target.value)}
         />
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {STATUSES.filter((s) => s.id !== report.status).map((s) => (
+          {/* Verified is not in here. It is not a thing a duty officer decides
+              at a desk, so it has its own control below with a name on it. */}
+          {STATUSES.filter((s) => s.id !== report.status && s.id !== 'verified').map((s) => (
             <button
               key={s.id}
               type="button"
@@ -656,6 +720,9 @@ function Detail({ report, group, suburb, onStatus }: DetailProps) {
           The reporter sees this within seconds on their tracking page. That is the whole point.
         </p>
       </div>
+
+      <Verify report={report} note={note} onStatus={onStatus} />
+      <Publish report={report} target={target} onPublish={onPublish} />
 
       <div className="mt-4 border-t border-grey-200 pt-4">
         <h3 className="text-base font-semibold">History</h3>
@@ -688,5 +755,179 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
       <dt className="font-semibold text-muted">{label}</dt>
       <dd>{children}</dd>
     </>
+  )
+}
+
+// Somebody has said this is fixed. That is a lead, not an outcome, and the panel
+// is written so an operator cannot skim it as one — no green, no tick, and it
+// stays on screen after the status moves so the two can be read against each
+// other.
+function FixClaimNotice({ claim, status }: { claim: FixClaim; status: StatusId }) {
+  const who = REPORTER_KINDS.find((k) => k.id === claim.by)?.label || 'A member of the public'
+  const settled = status === 'resolved' || status === 'no-action'
+
+  return (
+    <div className="mt-3 border-t-rule border-wcc-black bg-grey-050 p-3">
+      <p className="text-sm font-semibold">
+        {claim.count > 1
+          ? `${claim.count} people say this is fixed`
+          : `${who} says this is fixed`}{' '}
+        — {relativeWhen(claim.at)}
+      </p>
+      {claim.note && <p className="mt-1 text-sm text-grey-600">“{claim.note}”</p>}
+      <p className="mt-1.5 text-xs text-muted">
+        {claim.count > 1
+          ? `First said ${relativeWhen(claim.firstAt)}, most recently ${formatWhen(claim.at)}`
+          : formatWhen(claim.at)}
+        {claim.source === 'feed' && ' · against a report on the shared feed, not this queue'}
+      </p>
+      <p className="mt-2 text-xs">
+        {settled
+          ? 'The status has since been set. Worth checking the claim was what settled it.'
+          : 'Unverified. Confirm it below before the status changes — nothing has moved on this alone.'}
+      </p>
+    </div>
+  )
+}
+
+// Verifying is the step this whole prototype turns on: it is where an
+// unverified public post becomes something the Council is willing to publish.
+// So it names an organisation, and it is the only way to reach the status.
+function Verify({
+  report,
+  note,
+  onStatus,
+}: {
+  report: Report
+  note: string
+  onStatus: (reference: string, status: StatusId, note: string, verifier?: string) => void
+}) {
+  const verifiedEntry = [...report.timeline].reverse().find((e) => e.status === 'verified')
+
+  return (
+    <div className="mt-4 border-t border-grey-200 pt-4">
+      <h3 className="text-base font-semibold">Confirmed on the ground?</h3>
+
+      {report.status === 'verified' && verifiedEntry ? (
+        <p className="mt-2 rounded border border-wcc-black bg-grey-050 p-2.5 text-sm">
+          Verified by <strong>{verifiedEntry.by}</strong>, {formatWhen(verifiedEntry.at)}.
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-muted">
+          Only for a report a first responder or a Council crew has actually seen. It goes on the
+          record in their name.
+        </p>
+      )}
+
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {VERIFIERS.map((v) => (
+          <button
+            key={v.id}
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => onStatus(report.reference, 'verified', note, v.id)}
+          >
+            {verifiedEntry ? `Re-verify — ${v.label}` : `Verified by ${v.label}`}
+          </button>
+        ))}
+      </div>
+
+      {verifiedEntry && report.status !== 'verified' && (
+        <p className="mt-2 text-xs text-muted">
+          Verified by {verifiedEntry.by} earlier, {relativeWhen(verifiedEntry.at)}. The status has
+          moved on since.
+        </p>
+      )}
+    </div>
+  )
+}
+
+// Publishing pushes the report onto the shared feed other teams read, which
+// makes it the one control here with a consequence outside this laptop. It says
+// where the data is going before it goes, and it quotes the server when the push
+// fails rather than reporting a silent success.
+function Publish({
+  report,
+  target,
+  onPublish,
+}: {
+  report: Report
+  target: PublishTarget | null
+  onPublish: (reference: string) => void
+}) {
+  const [sending, setSending] = useState(false)
+  const ready = report.status === 'verified'
+
+  async function send(): Promise<void> {
+    setSending(true)
+    try {
+      await onPublish(report.reference)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="mt-4 border-t border-grey-200 pt-4">
+      <h3 className="text-base font-semibold">Publish to the shared feed</h3>
+      <p className="mt-1 text-xs text-muted">
+        Puts this report on the feed the public map and the other teams read, marked as verified by
+        the organisation that confirmed it. No contact details go with it.
+      </p>
+
+      {report.publishedAt && (
+        <div className="mt-2 rounded border border-wcc-black bg-grey-050 p-2.5 text-sm">
+          <p>
+            Published {formatWhen(report.publishedAt)} ({relativeWhen(report.publishedAt)}).
+          </p>
+          {report.publishedReference && (
+            <p className="mt-1 text-xs text-muted">
+              On the feed as <span className="ref">{report.publishedReference}</span> — the feed
+              mints its own reference, so this is a different record from{' '}
+              <span className="ref">{report.reference}</span>.
+            </p>
+          )}
+        </div>
+      )}
+
+      {report.publishError && (
+        <p role="alert" className="mt-2 border-t-rule border-error-fg bg-error-bg p-2.5 text-xs">
+          <strong className="block text-sm text-error-fg">Not published</strong>
+          <span className="ref mt-1 block break-words">{report.publishError}</span>
+        </p>
+      )}
+
+      <button
+        type="button"
+        className="btn btn-primary btn-sm mt-2"
+        disabled={!ready || sending}
+        onClick={send}
+      >
+        {sending
+          ? 'Publishing…'
+          : report.publishedAt
+            ? 'Publish again'
+            : 'Publish'}
+      </button>
+
+      {!ready && (
+        <p className="mt-2 text-xs text-muted">
+          Verify it first. The point of a published set is that everything in it was confirmed by
+          someone who was there.
+        </p>
+      )}
+
+      {target && (
+        <p className="mt-2 text-xs text-muted">
+          {target.configured ? (
+            <>
+              Target <span className="ref break-all">{target.url}</span>
+            </>
+          ) : (
+            target.reason
+          )}
+        </p>
+      )}
+    </div>
   )
 }

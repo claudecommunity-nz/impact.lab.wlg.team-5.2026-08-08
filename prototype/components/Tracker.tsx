@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import FixedIt from './FixedIt'
 import { STATUSES, statusById } from '../lib/schema'
-import type { Report, StatusId } from '../lib/types'
+import type { FixClaim, Report, StatusId } from '../lib/types'
 import { faultLabel } from '../lib/taxonomy'
 import { formatWhen, relativeWhen } from '../lib/time'
 
@@ -11,6 +12,7 @@ export default function Tracker() {
   const params = useSearchParams()
   const [reference, setReference] = useState(params.get('ref') || '')
   const [report, setReport] = useState<Report | null>(null)
+  const [claim, setClaim] = useState<FixClaim | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -23,11 +25,13 @@ export default function Tracker() {
       const res = await fetch(`/api/reports/${encodeURIComponent(trimmed)}`)
       if (res.status === 404) {
         setReport(null)
+        setClaim(null)
         setError('We could not find a report with that reference. Please check the letters again.')
         return
       }
       const data = await res.json()
       setReport(data.report)
+      setClaim(data.claim || null)
     } catch {
       setError('We could not reach the server. Please try again.')
     } finally {
@@ -77,12 +81,22 @@ export default function Tracker() {
         </p>
       )}
 
-      {report && <ReportStatus report={report} />}
+      {report && (
+        <ReportStatus report={report} claim={claim} onClaimed={() => lookup(report.reference)} />
+      )}
     </div>
   )
 }
 
-function ReportStatus({ report }: { report: Report }) {
+function ReportStatus({
+  report,
+  claim,
+  onClaimed,
+}: {
+  report: Report
+  claim: FixClaim | null
+  onClaimed: () => void
+}) {
   const status = statusById(report.status)
 
   return (
@@ -106,6 +120,8 @@ function ReportStatus({ report }: { report: Report }) {
       </p>
 
       <StatusRail current={report.status} />
+
+      <FixedIt reference={report.reference} claim={claim} onClaimed={onClaimed} />
 
       <div className="mt-6">
         <h3 className="text-lg font-semibold">Everything that has happened</h3>
