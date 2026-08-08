@@ -1,0 +1,28 @@
+{
+  "name": "impact-lab-wlg-team-5-db",
+  "version": "1.0.0",
+  "description": "Supabase database and public gold API for the Team 5 community reporting prototype",
+  "main": "index.js",
+  "scripts": {
+    "db:start": "supabase start -x studio,postgres-meta,edge-runtime,imgproxy,mailpit,vector,realtime,storage-api",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "seed:build": "node scripts/build-seed.mjs",
+    "gis:fetch": "node scripts/ingest-gis.mjs",
+    "check": "node scripts/check-contract.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/claudecommunity-nz/impact.lab.wlg.team-5.2026-08-08.git"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/claudecommunity-nz/impact.lab.wlg.team-5.2026-08-08/issues"
+  },
+  "homepage": "https://github.com/claudecommunity-nz/impact.lab.wlg.team-5.2026-08-08#readme",
+  "devDependencies": {
+    "supabase": "^2.112.0"
+  },
+  "private": true
+}

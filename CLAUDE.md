@@ -94,3 +94,7 @@ Three traps worth knowing before you lose an hour to them:
 
 - Keep the README's problem statement in sync if the scope shifts during the day.
 - Commit early and often — the repo is the submission.
+- **`docs/` is a living record of the current design — update it in the same
+  commit as the change, not afterwards.** Start at [docs/README.md](docs/README.md),
+  which maps each kind of change to the file it lands in. A doc describing
+  yesterday's schema is worse than no doc, because someone will build against it.
