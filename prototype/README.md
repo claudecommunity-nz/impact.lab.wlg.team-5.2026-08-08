@@ -28,8 +28,50 @@ on the resident's page within about five seconds. That is the demo.
 The categories, wizard shape and field names mirror the Council's existing public
 reporting tool (FIXiT, `services.wellington.govt.nz/report`), so this reads as an
 extension of a channel residents already know. It is a reimplementation — no
-Council code, styling or branding assets were copied — and it never posts to any
-real Council endpoint.
+Council code was copied — and it never posts to any real Council endpoint. The
+interface is built with the Council's design system; see below.
+
+## Design system
+
+The interface uses the Wellington City Council design system supplied to the
+team, kept in `docs/Wellington City Council Design System/`. Read its
+`HANDOFF.md` before changing anything visual.
+
+- `app/tokens/*.css` are the bundle's token files copied verbatim, except
+  `fonts.css`, whose `@font-face` URLs point at `/fonts/` so Next.js serves them
+  from `public/`. Do not hand-edit them — take a fresh copy from the bundle.
+- `tailwind.config.js` maps every colour, type step, radius and duration onto
+  those custom properties. Nothing in it invents a value.
+- Reusable patterns live as classes in `app/globals.css`: `.btn`, `.field`,
+  `.card`, `.label`, `.hint`, `.error`, `.ref`, `.te-reo`, `.rule-yellow`,
+  `.map-plate`.
+
+Three things to know before editing:
+
+- **Yellow is a signal, not a surface.** It carries the 4px rule under the
+  masthead, the primary button, the rule under a page title, the current step and
+  the current nav item. It never sits behind body copy and never carries white
+  text.
+- **The 2px black focus ring at 2px offset is non-negotiable.** It is set once,
+  in the base layer, for every interactive element.
+- **Opacity signals disabled and nothing else.** Reach for a grey token rather
+  than `text-black/60`; the opacity modifiers do not work through `var()` anyway.
+
+Two deliberate departures, both flagged in the code:
+
+- **Te reo Māori titles appear on the report wizard steps only.** The four
+  pairings come from the design system's Fixit UI kit, whose README says the live
+  Fixit service could not be read — they are the kit author's informed
+  inventions, not verified Council copy. The home, track and console pages carry
+  no te reo line rather than an invented one. Get the real pairings from the
+  Council.
+- **The logo is proprietary.** `public/wcc-logo.svg` and `wcc-logo-white.svg` are
+  the Council's mark. Check the Council's legal notice before this repo or any
+  derivative is published externally. Removing them is a two-line change in
+  `app/layout.tsx`.
+
+Asap stands in for the Council's own typeface, which is not published. Swapping
+it is a one-file change in `app/tokens/fonts.css`.
 
 What the current channel has no concept of, and this adds:
 

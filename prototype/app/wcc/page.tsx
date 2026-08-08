@@ -5,7 +5,7 @@ export const metadata: Metadata = { title: 'Council console — Wellington (prot
 
 export default function WccPage() {
   return (
-    <div className="mx-auto max-w-[100rem] px-4 py-6">
+    <div className="mx-auto max-w-[100rem] px-gutter py-6">
       <Console />
     </div>
   )

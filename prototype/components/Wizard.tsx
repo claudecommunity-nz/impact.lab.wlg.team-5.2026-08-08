@@ -54,6 +54,19 @@ interface StepProps {
 
 const STEPS = ['What', 'Where', 'Details', 'You', 'Done']
 
+// Bilingual titles are a design system non-negotiable. These four pairings come
+// from the Fixit UI kit in the bundle — its README flags that the live Fixit
+// service could not be read, so they are the kit author's informed inventions,
+// not verified Council copy. Only "Whākina he raruraru / Report a problem" was
+// read from wellington.govt.nz. Get the real pairings from the Council before
+// this goes anywhere near production.
+const TE_REO: Record<number, string> = {
+  0: 'He aha te raruraru?',
+  1: 'Kei hea?',
+  2: 'Ngā taipitopito',
+  3: 'Ō pārongo',
+}
+
 const EMPTY: FormState = {
   service: '',
   faultType: '',
@@ -87,25 +100,25 @@ export default function Wizard() {
   function validateStep(index: number): boolean {
     const next: FormErrors = {}
     if (index === 0) {
-      if (!form.service) next.service = 'Please select a service'
-      if (!form.faultType) next.faultType = 'Please select what you are reporting'
+      if (!form.service) next.service = 'Select a service'
+      if (!form.faultType) next.faultType = 'Select what you are reporting'
     }
     if (index === 1 && !form.location) {
-      next.location = 'Please drop a pin so we know where this is'
+      next.location = 'Drop a pin so we know where this is'
     }
     if (index === 2) {
-      if (!form.faultDesc.trim()) next.faultDesc = 'Please tell us what you can see'
+      if (!form.faultDesc.trim()) next.faultDesc = 'Tell us what you can see'
       if (isEmergencyService(form.service) && !form.severity) {
-        next.severity = 'Please tell us how bad it is'
+        next.severity = 'Tell us how bad it is'
       }
       if (form.reporterKind === 'hub' && !form.hubName.trim()) {
-        next.hubName = 'Please tell us which hub'
+        next.hubName = 'Tell us which hub'
       }
     }
     if (index === 3 && !form.anonymous) {
-      if (!form.contactFirstName.trim()) next.contactFirstName = 'Please provide your first name'
+      if (!form.contactFirstName.trim()) next.contactFirstName = 'Enter your first name'
       if (!form.contactEmail.trim() && !form.contactPhone.trim()) {
-        next.contactEmail = 'Please give us an email address or a phone number'
+        next.contactEmail = 'Enter an email address or a phone number'
       }
     }
     setErrors(next)
@@ -157,7 +170,7 @@ export default function Wizard() {
       if (!res.ok) {
         setSubmitError(
           data.errors
-            ? 'Some details need fixing. Please go back and check them.'
+            ? 'Some details need fixing. Go back and check them.'
             : 'A server error occurred during submission.',
         )
         return
@@ -165,7 +178,7 @@ export default function Wizard() {
       setReceipt(data.report)
       setStep(4)
     } catch {
-      setSubmitError('We could not reach the server. Please try again.')
+      setSubmitError('We could not reach the server. Try again.')
     } finally {
       setSubmitting(false)
     }
@@ -175,7 +188,7 @@ export default function Wizard() {
 
   return (
     <div>
-      <Progress step={step} />
+      <StepIndicator step={step} />
 
       <div className="card mt-6 p-6">
         {step === 0 && <StepWhat form={form} set={set} errors={errors} />}
@@ -194,24 +207,25 @@ export default function Wizard() {
         {step === 3 && <StepYou form={form} set={set} errors={errors} />}
 
         {submitError && (
-          <div className="mt-5 rounded border border-urgent bg-red-50 p-4 text-sm font-medium text-urgent">
-            {submitError} You can call us on {CONTACT_CENTRE}.
-          </div>
+          <Callout tone="error" className="mt-6">
+            <p className="font-semibold text-error-fg">{submitError}</p>
+            <p className="mt-1 text-sm">You can call us on {CONTACT_CENTRE}.</p>
+          </Callout>
         )}
 
-        <div className="mt-8 flex items-center gap-3 border-t border-council-line pt-5">
+        <div className="mt-8 flex items-center gap-3 border-t border-grey-200 pt-5">
           {step > 0 && (
-            <button type="button" className="btn-secondary" onClick={back}>
+            <button type="button" className="btn btn-secondary" onClick={back}>
               Back
             </button>
           )}
           {step < 3 && (
-            <button type="button" className="btn-primary ml-auto" onClick={next}>
+            <button type="button" className="btn btn-primary ml-auto" onClick={next}>
               Continue
             </button>
           )}
           {step === 3 && (
-            <button type="button" className="btn-primary ml-auto" onClick={submit} disabled={submitting}>
+            <button type="button" className="btn btn-primary ml-auto" onClick={submit} disabled={submitting}>
               {submitting ? 'Submitting…' : 'Submit report'}
             </button>
           )}
@@ -221,24 +235,66 @@ export default function Wizard() {
   )
 }
 
-function Progress({ step }: { step: number }) {
+// The design system's step progress: a 4px rule per step. Black behind, yellow
+// on the current one, grey ahead. No numbered pills.
+function StepIndicator({ step }: { step: number }) {
   return (
-    <ol className="flex flex-wrap gap-2 text-sm">
+    <ol className="flex gap-2">
       {STEPS.map((label, i) => (
-        <li
-          key={label}
-          className={`rounded-full border px-3 py-1 font-semibold ${
-            i === step
-              ? 'border-council-accent bg-council-accent text-white'
-              : i < step
-                ? 'border-council-accent/40 bg-white text-council-accent'
-                : 'border-council-line bg-white text-council-ink/40'
-          }`}
-        >
-          {i + 1}. {label}
+        <li key={label} className="flex flex-1 flex-col gap-2">
+          <span
+            aria-hidden="true"
+            className={`block h-rule rounded-full ${
+              i < step ? 'bg-wcc-black' : i === step ? 'bg-wcc-yellow' : 'bg-grey-200'
+            }`}
+          />
+          <span
+            className={`text-sm ${i === step ? 'font-semibold text-wcc-black' : 'text-muted'}`}
+            aria-current={i === step ? 'step' : undefined}
+          >
+            {label}
+          </span>
         </li>
       ))}
     </ol>
+  )
+}
+
+// A tinted surface with a 4px rule on its top edge. Yellow is a signal here,
+// never a background behind body copy.
+function Callout({
+  tone,
+  className = '',
+  children,
+}: {
+  tone: 'error' | 'warning' | 'info' | 'brand'
+  className?: string
+  children: React.ReactNode
+}) {
+  const tones = {
+    error: 'border-error-fg bg-error-bg',
+    warning: 'border-warning-fg bg-warning-bg',
+    info: 'border-info-fg bg-info-bg',
+    brand: 'border-wcc-yellow bg-brand-100',
+  }
+  return (
+    <div
+      role={tone === 'error' ? 'alert' : undefined}
+      className={`border-t-rule px-5 py-4 ${tones[tone]} ${className}`}
+    >
+      {children}
+    </div>
+  )
+}
+
+function StepHeading({ step, title, hint }: { step: number; title: string; hint: string }) {
+  return (
+    <div>
+      {TE_REO[step] && <p className="te-reo">{TE_REO[step]}</p>}
+      <h1 className="mt-1 text-2xl font-bold tracking-[-0.015em]">{title}</h1>
+      <span aria-hidden="true" className="rule-yellow mt-3" />
+      <p className="mt-3 max-w-measure hint">{hint}</p>
+    </div>
   )
 }
 
@@ -247,8 +303,11 @@ function StepWhat({ form, set, errors }: StepProps) {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">What are you reporting?</h1>
-      <p className="mt-2 hint">Pick the closest match. We can sort it out at our end if it is not exact.</p>
+      <StepHeading
+        step={0}
+        title="What are you reporting?"
+        hint="Pick the closest match. We can sort it out at our end if it is not exact."
+      />
 
       <div className="mt-6 space-y-2">
         {SERVICES.map((s) => (
@@ -256,21 +315,22 @@ function StepWhat({ form, set, errors }: StepProps) {
             key={s.id}
             type="button"
             onClick={() => set({ service: s.id, faultType: '' })}
-            className={`w-full rounded border p-4 text-left transition ${
+            aria-pressed={form.service === s.id}
+            className={`min-h-tap w-full rounded border p-4 text-left transition-colors duration-fast ease-standard ${
               form.service === s.id
-                ? 'border-council-accent bg-council-accent/5 ring-1 ring-council-accent/30'
-                : 'border-council-line bg-white hover:bg-council-sand'
+                ? 'border-thick border-wcc-black bg-brand-100'
+                : 'border-grey-300 bg-wcc-white hover:bg-grey-50'
             }`}
           >
-            <span className="flex items-center gap-2 font-semibold">
+            <span className="flex flex-wrap items-center gap-2 font-semibold">
               {s.label}
               {s.emergency && (
-                <span className="rounded bg-urgent px-2 py-0.5 text-xs font-bold text-white">
+                <span className="rounded-full bg-wcc-yellow px-2.5 py-0.5 text-xs font-semibold uppercase tracking-[0.04em] text-wcc-black">
                   During an event
                 </span>
               )}
             </span>
-            <span className="mt-1 block text-sm text-council-ink/60">{s.blurb}</span>
+            <span className="mt-1 block text-sm text-grey-600">{s.blurb}</span>
           </button>
         ))}
       </div>
@@ -284,10 +344,11 @@ function StepWhat({ form, set, errors }: StepProps) {
           <select
             id="faultType"
             className="field"
+            aria-invalid={errors.faultType ? 'true' : undefined}
             value={form.faultType}
             onChange={(e) => set({ faultType: e.target.value })}
           >
-            <option value="">Please select…</option>
+            <option value="">Select…</option>
             {service.faults.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.label}
@@ -304,30 +365,31 @@ function StepWhat({ form, set, errors }: StepProps) {
 
 // The existing Council tool does this and it is the right call: some things
 // should not go into a queue. We keep the interruption rather than quietly
-// accepting a life-safety report.
+// accepting a life-safety report. Urgency is stated, not implied, and it comes
+// with a phone number.
 function EscalationNotice({ faultType }: { faultType: string }) {
   if (CALL_111.has(faultType)) {
     return (
-      <div className="mt-4 rounded border-2 border-urgent bg-red-50 p-4">
-        <p className="font-bold text-urgent">If anyone is in danger, call 111 now.</p>
-        <p className="mt-1 text-sm text-council-ink/80">
+      <Callout tone="error" className="mt-4">
+        <p className="font-semibold text-error-fg">If anyone is in danger, call 111 now.</p>
+        <p className="mt-1 max-w-measure text-sm">
           You can still leave a report here so the Council has the picture, but a report is not a
           call for help and no one is watching this form second by second.
         </p>
-      </div>
+      </Callout>
     )
   }
   if (CALL_CONTACT_CENTRE.has(faultType)) {
     return (
-      <div className="mt-4 rounded border border-amber-400 bg-amber-50 p-4">
-        <p className="font-semibold text-amber-900">
+      <Callout tone="warning" className="mt-4">
+        <p className="font-semibold text-warning-fg">
           If this affects a large group of people, call the Contact Centre on {CONTACT_CENTRE}.
         </p>
-        <p className="mt-1 text-sm text-council-ink/80">
+        <p className="mt-1 max-w-measure text-sm">
           Outages and water faults are usually handled by the lines or water company, and a phone
           call reaches them faster.
         </p>
-      </div>
+      </Callout>
     )
   }
   return null
@@ -351,13 +413,13 @@ function StepWhere({
 }: StepWhereProps) {
   return (
     <div>
-      <h1 className="text-2xl font-bold">Where is it?</h1>
-      <p className="mt-2 hint">
-        A pin is worth more than an address to the people reading this — it puts your report on the
-        same map as everything else.
-      </p>
+      <StepHeading
+        step={1}
+        title="Where is it?"
+        hint="A pin is worth more than an address to the people reading this — it puts your report on the same map as everything else."
+      />
 
-      <div className="mt-5">
+      <div className="mt-6">
         <MapPicker
           value={form.location}
           onChange={(loc) => set({ location: loc })}
@@ -367,9 +429,9 @@ function StepWhere({
         {errors.location && <p className="error">{errors.location}</p>}
       </div>
 
-      <div className="mt-5">
+      <div className="mt-field">
         <label className="label" htmlFor="locAddress">
-          Nearest address or landmark <span className="font-normal text-council-ink/50">(optional)</span>
+          Nearest address or landmark <span className="font-normal text-muted">(optional)</span>
         </label>
         <input
           id="locAddress"
@@ -409,10 +471,13 @@ function StepDetails({ form, set, errors }: StepProps) {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Tell us what you can see</h1>
-      <p className="mt-2 hint">Please include as many relevant details as you can.</p>
+      <StepHeading
+        step={2}
+        title="Tell us what you can see"
+        hint="Include as many relevant details as you can."
+      />
 
-      <div className="mt-5">
+      <div className="mt-6">
         <label className="label" htmlFor="faultDesc">
           Description
         </label>
@@ -420,6 +485,7 @@ function StepDetails({ form, set, errors }: StepProps) {
           id="faultDesc"
           rows={5}
           className="field"
+          aria-invalid={errors.faultDesc ? 'true' : undefined}
           placeholder="What is happening, how bad it is, whether it is getting worse."
           value={form.faultDesc}
           onChange={(e) => set({ faultDesc: e.target.value })}
@@ -434,22 +500,22 @@ function StepDetails({ form, set, errors }: StepProps) {
             {SEVERITIES.map((s) => (
               <label
                 key={s.id}
-                className={`flex cursor-pointer gap-3 rounded border p-3 ${
+                className={`flex min-h-tap cursor-pointer gap-3 rounded border p-3 transition-colors duration-fast ease-standard ${
                   form.severity === s.id
-                    ? 'border-council-accent bg-council-accent/5'
-                    : 'border-council-line bg-white'
+                    ? 'border-wcc-black bg-brand-100'
+                    : 'border-grey-300 bg-wcc-white'
                 }`}
               >
                 <input
                   type="radio"
                   name="severity"
-                  className="mt-1"
+                  className="mt-0.5"
                   checked={form.severity === s.id}
                   onChange={() => set({ severity: s.id })}
                 />
                 <span>
                   <span className="block font-semibold">{s.label}</span>
-                  <span className="block text-sm text-council-ink/60">{s.hint}</span>
+                  <span className="block text-sm text-muted">{s.hint}</span>
                 </span>
               </label>
             ))}
@@ -458,10 +524,10 @@ function StepDetails({ form, set, errors }: StepProps) {
         </fieldset>
       )}
 
-      <div className="mt-6 grid gap-5 sm:grid-cols-2">
+      <div className="mt-6 grid gap-field sm:grid-cols-2">
         <div>
           <label className="label" htmlFor="observedAt">
-            When did you see this? <span className="font-normal text-council-ink/50">(optional)</span>
+            When did you see this? <span className="font-normal text-muted">(optional)</span>
           </label>
           <input
             id="observedAt"
@@ -470,7 +536,7 @@ function StepDetails({ form, set, errors }: StepProps) {
             value={form.observedAt}
             onChange={(e) => set({ observedAt: e.target.value })}
           />
-          <p className="mt-1 hint">Leave blank if it is happening now.</p>
+          <p className="mt-2 hint">Leave blank if it is happening now.</p>
         </div>
 
         <div>
@@ -493,19 +559,20 @@ function StepDetails({ form, set, errors }: StepProps) {
       </div>
 
       {form.reporterKind === 'hub' && (
-        <div className="mt-5">
+        <div className="mt-field">
           <label className="label" htmlFor="hubName">
             Which hub?
           </label>
           <input
             id="hubName"
             className="field"
+            aria-invalid={errors.hubName ? 'true' : undefined}
             placeholder="e.g. Hataitai Community Emergency Hub"
             value={form.hubName}
             onChange={(e) => set({ hubName: e.target.value })}
           />
           {errors.hubName && <p className="error">{errors.hubName}</p>}
-          <p className="mt-1 hint">
+          <p className="mt-2 hint">
             Reports from a staffed hub are flagged in the Council console, because someone has
             physically been there.
           </p>
@@ -522,21 +589,26 @@ function StepDetails({ form, set, errors }: StepProps) {
 function StepYou({ form, set, errors }: StepProps) {
   return (
     <div>
-      <h1 className="text-2xl font-bold">How can we get back to you?</h1>
-      <p className="mt-2 hint">
-        We use this to tell you what happened to your report, and to ask a question if we need to.
-      </p>
+      <StepHeading
+        step={3}
+        title="How can we get back to you?"
+        hint="We use this to tell you what happened to your report, and to ask a question if we need to."
+      />
 
-      <label className="mt-5 flex cursor-pointer items-start gap-3 rounded border border-council-line bg-white p-4">
+      <label
+        className={`mt-6 flex min-h-tap cursor-pointer items-start gap-3 rounded border p-4 transition-colors duration-fast ease-standard ${
+          form.anonymous ? 'border-wcc-black bg-brand-100' : 'border-grey-300 bg-wcc-white'
+        }`}
+      >
         <input
           type="checkbox"
-          className="mt-1"
+          className="mt-0.5"
           checked={form.anonymous}
           onChange={(e) => set({ anonymous: e.target.checked })}
         />
         <span>
           <span className="block font-semibold">Report without leaving my details</span>
-          <span className="block text-sm text-council-ink/60">
+          <span className="block text-sm text-muted">
             You still get a reference number, and you can still track the report with it. We just
             cannot contact you.
           </span>
@@ -544,12 +616,13 @@ function StepYou({ form, set, errors }: StepProps) {
       </label>
 
       {!form.anonymous && (
-        <div className="mt-6 grid gap-5 sm:grid-cols-2">
+        <div className="mt-6 grid gap-field sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="contactFirstName">First name</label>
             <input
               id="contactFirstName"
               className="field"
+              aria-invalid={errors.contactFirstName ? 'true' : undefined}
               value={form.contactFirstName}
               onChange={(e) => set({ contactFirstName: e.target.value })}
             />
@@ -557,7 +630,7 @@ function StepYou({ form, set, errors }: StepProps) {
           </div>
           <div>
             <label className="label" htmlFor="contactLastName">
-              Last name <span className="font-normal text-council-ink/50">(optional)</span>
+              Last name <span className="font-normal text-muted">(optional)</span>
             </label>
             <input
               id="contactLastName"
@@ -572,6 +645,7 @@ function StepYou({ form, set, errors }: StepProps) {
               id="contactEmail"
               type="email"
               className="field"
+              aria-invalid={errors.contactEmail ? 'true' : undefined}
               value={form.contactEmail}
               onChange={(e) => set({ contactEmail: e.target.value })}
             />
@@ -597,15 +671,20 @@ function StepYou({ form, set, errors }: StepProps) {
 
 function Summary({ form }: { form: FormState }) {
   return (
-    <div className="mt-8 rounded border border-council-line bg-council-sand p-4 text-sm">
-      <h2 className="font-bold">What you are sending</h2>
+    <div className="mt-8 rounded border border-grey-200 bg-grey-50 p-4 text-sm">
+      <h2 className="font-semibold">What you are sending</h2>
       <dl className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-[10rem_1fr]">
         <dt className="font-semibold">Issue</dt>
         <dd>{faultLabel(form.service, form.faultType)}</dd>
         <dt className="font-semibold">Location</dt>
         <dd>
           {form.locAddress || 'Pin only'}
-          {form.location && ` (${form.location.lat.toFixed(5)}, ${form.location.lng.toFixed(5)})`}
+          {form.location && (
+            <span className="ref">
+              {' '}
+              ({form.location.lat.toFixed(5)}, {form.location.lng.toFixed(5)})
+            </span>
+          )}
         </dd>
         <dt className="font-semibold">Description</dt>
         <dd className="whitespace-pre-wrap">{form.faultDesc || '—'}</dd>
@@ -618,22 +697,18 @@ function Summary({ form }: { form: FormState }) {
 
 function Receipt({ report, onAnother }: { report: Report; onAnother: () => void }) {
   return (
-    <div className="card p-6">
-      <div className="rounded border-2 border-council-accent bg-council-accent/5 p-5">
-        <h1 className="text-2xl font-bold">Thank you — we have your report</h1>
-        <p className="mt-2">Your reference number is</p>
-        <p className="mt-1 text-3xl font-bold tracking-wider text-council-accent">
-          {report.reference}
-        </p>
-        <p className="mt-3 text-sm text-council-ink/80">
-          Write this down. You can check what is happening with your report at any time, and you can
-          read it out over the phone or a radio.
-        </p>
-      </div>
+    <div className="card card-accent p-6">
+      <h1 className="text-2xl font-bold tracking-[-0.015em]">Thank you — we have your report</h1>
+      <p className="mt-3">Your reference number is</p>
+      <p className="ref mt-1 text-3xl">{report.reference}</p>
+      <p className="mt-3 max-w-measure text-sm">
+        Write this down. You can check what is happening with your report at any time, and you can
+        read it out over the phone or a radio.
+      </p>
 
-      <div className="mt-6">
-        <h2 className="font-bold">What happens next</h2>
-        <ol className="mt-2 space-y-2 text-council-ink/80">
+      <div className="mt-6 border-t border-grey-200 pt-5">
+        <h2 className="text-xl font-semibold">What happens next</h2>
+        <ol className="mt-3 max-w-measure space-y-2">
           <li>
             <strong>1. Received</strong> — done. Your report is in the queue and visible to the
             Council duty officer right now.
@@ -646,17 +721,17 @@ function Receipt({ report, onAnother }: { report: Report; onAnother: () => void 
             <strong>3. Being acted on</strong> — it is passed to whoever can deal with it.
           </li>
         </ol>
-        <p className="mt-3 hint">
+        <p className="mt-3 max-w-measure hint">
           Every step is timestamped and you can see all of it. If nothing happens, you will be able
           to see that too.
         </p>
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
-        <Link href={`/track?ref=${report.reference}`} className="btn-primary">
+        <Link href={`/track?ref=${report.reference}`} className="btn btn-primary">
           Track this report
         </Link>
-        <button type="button" className="btn-secondary" onClick={onAnother}>
+        <button type="button" className="btn btn-secondary" onClick={onAnother}>
           Report another problem
         </button>
       </div>

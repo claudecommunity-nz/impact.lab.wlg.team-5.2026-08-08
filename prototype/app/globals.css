@@ -1,45 +1,240 @@
+/* Wellington City Council design system.
+ *
+ * The token files under app/tokens/ are copied verbatim from the Council design
+ * system bundle in docs/, except fonts.css, whose @font-face URLs are rewritten
+ * to /fonts/ so Next.js serves them from public/. Do not hand-edit them — take a
+ * fresh copy from the bundle instead, so the tokens stay a single source.
+ */
+@import './tokens/fonts.css';
+@import './tokens/colors.css';
+@import './tokens/typography.css';
+@import './tokens/spacing.css';
+@import './tokens/border-shadow.css';
+@import './tokens/motion.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   body {
-    @apply bg-council-sand text-council-ink antialiased;
+    background: var(--surface-page);
+    color: var(--text-body);
+    font: var(--type-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: var(--text-strong);
+    text-wrap: pretty;
+  }
+
+  /* Non-negotiable in the design system, and the accessibility guarantee of a
+   * government service: every interactive element shows the same ring. */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: var(--border-width-thick) solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--wcc-yellow);
+    color: var(--wcc-black);
   }
 }
 
 @layer components {
+  /* --- form controls ---------------------------------------------------- */
+
   .field {
-    @apply w-full rounded border border-council-line bg-white px-3 py-2 text-base
-           outline-none focus:border-council-accent focus:ring-2 focus:ring-council-accent/30;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: var(--tap-min);
+    padding: 10px 12px;
+    font: var(--type-body);
+    color: var(--text-body);
+    background: var(--wcc-white);
+    /* grey-400 rather than the container hairline, so the outline itself
+     * clears the contrast requirement against white. */
+    border: var(--border-width) solid var(--grey-400);
+    border-radius: var(--radius-md);
+    transition: var(--transition-ui);
   }
 
+  .field:focus {
+    border-color: var(--wcc-black);
+    outline: var(--border-width-thick) solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  .field[aria-invalid='true'] {
+    border-width: var(--border-width-thick);
+    border-color: var(--status-error-fg);
+  }
+
+  select.field {
+    appearance: none;
+    padding-right: 40px;
+    cursor: pointer;
+    /* The system ships no icons; the chevron is drawn with gradients. */
+    background-image: linear-gradient(45deg, transparent 50%, var(--wcc-black) 50%),
+      linear-gradient(135deg, var(--wcc-black) 50%, transparent 50%);
+    background-position: calc(100% - 20px) calc(50% + 2px), calc(100% - 14px) calc(50% + 2px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+  }
+
+  textarea.field {
+    resize: vertical;
+    line-height: var(--lh-body);
+  }
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+    accent-color: var(--wcc-black);
+  }
+
+  /* --- buttons ---------------------------------------------------------- */
+
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded px-4 py-2.5 text-sm
-           font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-height: var(--tap-min);
+    padding: 10px 18px;
+    font: var(--type-label);
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    border: var(--border-width-thick) solid transparent;
+    border-radius: var(--radius-md);
+    transition: var(--transition-ui);
+  }
+
+  /* Press is a 1px nudge. No scale, no bounce, no ripple. */
+  .btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  /* Opacity signals disabled and nothing else. */
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   .btn-primary {
-    @apply btn bg-council-accent text-white hover:bg-council-accent/90;
+    background: var(--wcc-yellow);
+    border-color: var(--wcc-yellow);
+    color: var(--wcc-black);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--yellow-600);
+    border-color: var(--yellow-600);
   }
 
   .btn-secondary {
-    @apply btn border border-council-line bg-white text-council-ink hover:bg-council-sand;
+    background: transparent;
+    border-color: var(--wcc-black);
+    color: var(--wcc-black);
   }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--wcc-black);
+    color: var(--wcc-white);
+  }
+
+  .btn-sm {
+    min-height: 36px;
+    padding: 6px 12px;
+    font-size: var(--fs-200);
+  }
+
+  /* --- surfaces --------------------------------------------------------- */
 
   .card {
-    @apply rounded-lg border border-council-line bg-white;
+    background: var(--surface-card);
+    border: var(--border-width) solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-none);
   }
 
+  /* An emphasised card takes the 4px yellow rule on its top edge. A coloured
+   * left border is not part of this system. */
+  .card-accent {
+    border-top: var(--rule-heavy) solid var(--wcc-yellow);
+  }
+
+  .card-interactive {
+    transition: var(--transition-ui), box-shadow var(--dur-fast) var(--ease-standard);
+  }
+
+  .card-interactive:hover {
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-raised);
+  }
+
+  /* --- text ------------------------------------------------------------- */
+
   .label {
-    @apply mb-1.5 block text-sm font-semibold text-council-ink;
+    display: block;
+    margin-bottom: var(--space-2);
+    font: var(--type-label);
+    color: var(--text-strong);
   }
 
   .hint {
-    @apply text-sm text-council-ink/60;
+    font: var(--type-body-sm);
+    color: var(--text-muted);
   }
 
   .error {
-    @apply mt-1 text-sm font-medium text-urgent;
+    margin-top: var(--space-2);
+    font: var(--type-body-sm);
+    font-weight: var(--fw-semibold);
+    color: var(--status-error-fg);
+  }
+
+  /* Reference numbers and coordinates only — the mono face carries nothing
+   * else in this system. */
+  .ref {
+    font: var(--type-reference);
+  }
+
+  .te-reo {
+    font: var(--type-te-reo);
+    color: var(--text-muted);
+  }
+
+  /* The recurring structural motif: under the masthead, above the footer,
+   * under a page title, on a step bar. */
+  .rule-yellow {
+    display: block;
+    width: 64px;
+    height: var(--rule-heavy);
+    background: var(--wcc-yellow);
+  }
+
+  /* The only approved transparency in this system: a white-at-85% plate over a
+   * map, so the label stays legible. No frosted glass anywhere else. */
+  .map-plate {
+    background: rgba(255, 255, 255, 0.85);
+  }
+
+  a.link {
+    color: var(--text-link);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: var(--transition-ui);
+  }
+
+  a.link:hover {
+    color: var(--text-link-hover);
   }
 }
