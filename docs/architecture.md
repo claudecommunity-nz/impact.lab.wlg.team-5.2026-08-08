@@ -74,7 +74,9 @@ privilege at all on `silver.report`.
 | Piece | Where | What it is |
 |---|---|---|
 | Migrations | `supabase/migrations/` | The schema, applied in filename order |
-| Seed | `supabase/seed.sql` | **Generated** by `scripts/build-seed.mjs` — edit the generator, never the SQL |
+| Seed | `supabase/seed.sql` | **Generated** by `scripts/build-seed.mjs` — edit the generator, never the SQL. 36 hubs, 28 reports, their status trails |
+| GIS data | `supabase/gis-ingest.sql` | **Generated** by `scripts/ingest-gis.mjs`. All 74 datasets catalogued, 746 features mirrored |
+| Catalogue cache | `data/catalogue.json` | The upstream WCC dataset catalogue, cached so a rebuild needs no network |
 | Prototype app | `prototype/` | Next.js: `/report` (wizard), `/track` (receipt), `/wcc` (console) |
 | App API routes | `prototype/app/api/` | `feed` (GeoJSON), `reports` (POST), `reports/[reference]` (GET/PATCH) |
 | Shared taxonomy | `prototype/lib/taxonomy.ts` | Services and fault types the form offers; mirrored into `silver.service` / `silver.fault_type` |
@@ -92,11 +94,41 @@ so the output that matters is the feed, not our UI:
   WCC actually uses.
 - `gold.hubs_geojson()` and `gold.clusters_geojson()` do the same for hubs and
   grouped reports.
+- `gold.dataset_catalogue` lists all 74 WCC hazard and infrastructure layers with
+  publisher, licence and endpoint, so another team can find a layer through us
+  and then go straight to the source for it.
+
+## The hazard layers, and why they are in the same database
+
+`silver.dataset` (74 rows), `silver.dataset_feature` (746 mirrored features) and
+`silver.source_snapshot` (one row per fetch, including the failures) sit
+alongside the reports on purpose.
+
+A report reading "water over the road" is a fact about one street. The same
+report inside a mapped ponding area is a fact WCC had a modelled reason to
+expect. One *outside* every mapped area is the more interesting of the two —
+the city behaving in a way the planning layers did not predict, which is the
+case community reporting exists to catch. `gold.hazard_context_summary` is that
+number: currently 8 of 28 inside, 20 outside.
+
+The join runs against the **exact** location in `silver`, never the fuzzed
+public one, because a 100m cell straddles hazard boundaries and would be wrong
+in both directions. Only the yes/no is published.
+
+Licence gates what leaves. The upstream catalogue records a licence note for
+exactly one of the 74 datasets; unstated is not permission, and this repo is
+public. So the mirror is private and `gold.layer_geojson` republishes only what
+has been explicitly cleared — today, one layer. For everything else it returns
+the publisher, the endpoint and a plain refusal rather than an empty
+`FeatureCollection` that reads as "there is nothing there".
 
 ## In flight
 
-- **Ownership and priority** — migrations `0008` and `0009`. See
-  [classification.md](classification.md).
+- **Setting ownership and priority through the API.** Both are published by
+  `gold` but can only be changed inside `silver`; there is no triage endpoint
+  yet. See [classification.md](classification.md).
+- **Rate limiting on `submit_report`.** Anyone may file a report, which is the
+  point of a public channel, but nothing throttles it.
 
 ---
 

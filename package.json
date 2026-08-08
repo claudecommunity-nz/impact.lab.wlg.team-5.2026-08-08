@@ -8,7 +8,8 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "seed:build": "node scripts/build-seed.mjs",
-    "gis:fetch": "node scripts/ingest-gis.mjs"
+    "gis:fetch": "node scripts/ingest-gis.mjs",
+    "check": "node scripts/check-contract.mjs"
   },
   "repository": {
     "type": "git",
