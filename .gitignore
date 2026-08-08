@@ -5,3 +5,20 @@
 
 .DS_Store
 **/.DS_Store
+
+# Credentials. The repo is public — the Supabase service role key must never
+# land in it.
+.env
+.env.*
+!.env.example
+
+# Supabase local stack state. supabase/migrations, supabase/config.toml and
+# supabase/seed.sql are tracked deliberately: they are the database.
+supabase/.branches/
+supabase/.temp/
+
+# The prototype's file-backed store.
+.data/
+
+*.log
+npm-debug.log*

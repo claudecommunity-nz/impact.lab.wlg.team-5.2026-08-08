@@ -1,0 +1,22 @@
+{
+  "name": "impact.lab.wlg.team-5.2026-08-08",
+  "version": "1.0.0",
+  "description": "**Wellington City Council Emergency Management × Claude Code Community NZ**\r Saturday 8 August 2026 · Waimanga Room, Wellington City Council",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/claudecommunity-nz/impact.lab.wlg.team-5.2026-08-08.git"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/claudecommunity-nz/impact.lab.wlg.team-5.2026-08-08/issues"
+  },
+  "homepage": "https://github.com/claudecommunity-nz/impact.lab.wlg.team-5.2026-08-08#readme",
+  "devDependencies": {
+    "supabase": "^2.112.0"
+  }
+}
