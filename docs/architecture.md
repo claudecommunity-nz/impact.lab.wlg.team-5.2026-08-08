@@ -54,8 +54,11 @@ misconfigured one, not one behind a policy that turns out to be wrong.
 
 Three layers, in order of how much they matter:
 
-1. **Not exposed.** `schemas = ["public", "graphql_public", "gold"]`. This is the
-   one doing the real work.
+1. **Not exposed.** `schemas = ["gold", "public", "graphql_public"]`. This is the
+   one doing the real work. `gold` is listed *first* deliberately, which makes it
+   PostgREST's default profile: `GET /rest/v1/report` returns the filtered data
+   with no header at all. The safe schema is the one you get by default, and
+   `silver` is not on the list to be asked for.
 2. **Not granted.** `revoke all on schema silver from anon, authenticated,
    public`, and the same for its tables, sequences and functions, including
    default privileges for anything added later.
@@ -97,6 +100,6 @@ so the output that matters is the feed, not our UI:
 
 ---
 
-**Verified against:** `supabase/migrations/20260808000001`–`20260808000007`,
+**Verified against:** `supabase/migrations/20260808000001`–`20260808000014`,
 `supabase/config.toml`, `supabase/seed.sql` header, `prototype/` file listing —
 8 August 2026.

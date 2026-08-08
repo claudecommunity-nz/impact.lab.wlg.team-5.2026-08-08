@@ -169,5 +169,5 @@ runs after it.
 
 ---
 
-**Verified against:** `supabase/migrations/20260808000001`–`20260808000007`,
+**Verified against:** `supabase/migrations/20260808000001`–`20260808000014`,
 `supabase/seed.sql` (header and reference sections) — 8 August 2026.

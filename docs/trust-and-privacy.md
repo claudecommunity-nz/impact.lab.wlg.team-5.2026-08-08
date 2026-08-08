@@ -127,5 +127,5 @@ rows rather than living in a comment.
 
 ---
 
-**Verified against:** `supabase/migrations/20260808000003`–`20260808000007`,
+**Verified against:** `supabase/migrations/20260808000003`–`20260808000014`,
 `supabase/seed.sql` header, `prototype/lib/taxonomy.ts` — 8 August 2026.

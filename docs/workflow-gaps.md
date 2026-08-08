@@ -193,7 +193,7 @@ so migrations `0001`–`0007` on their own were broken for `anon`.
 
 ---
 
-**Verified against:** full chain `20260808000001`–`20260808000009` + `seed.sql`
+**Verified against:** full chain `20260808000001`–`20260808000014` + `seed.sql`
 on `supabase/postgres:17.6.1.158`, `prototype/lib/store.ts`,
 `prototype/app/api/reports/route.ts`, `prototype/components/Tracker.tsx`,
 `prototype/lib/taxonomy.ts` — 8 August 2026.
