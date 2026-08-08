@@ -1,5 +1,11 @@
 -- Confirming a report on the ground.
 --
+-- Renumbered from 20260808000015 to 21. That version was already recorded
+-- against a different migration on the deployed database, so `db push` would
+-- have seen this file's version as applied, skipped it, and reported success —
+-- leaving gold.confirm_report nonexistent on the live API while every log said
+-- the deploy worked.
+--
 -- `silver.verification_level` has existed since the first migration and
 -- `gold.disclaimer_for` already writes the right public wording for every value
 -- of it, but nothing could ever set it above 'corroborated'. The clustering
