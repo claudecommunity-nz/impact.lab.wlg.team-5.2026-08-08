@@ -108,9 +108,11 @@ its publisher, licence, endpoint and — the useful column — `availableVia`:
 | `publisher_image_service` | A raster. Ask it for a PNG, not features. |
 
 `lastFetchedAt`, `lastFeatureCount`, `lastFetchComplete` and `lastFetchError`
-come from the provenance log. A layer we could not reach says so, rather than
-appearing empty — `fault-hazard-overlay` currently carries
-`"Invalid or missing input parameters."`, which is the truth.
+come from the provenance log. A layer we could not reach says so rather than
+appearing empty. All eleven mirrored layers currently fetch clean; the two that
+did not (`fault-hazard-overlay`, `flood-hazard-areas`) were a group layer and a
+service root respectively — neither is queryable at the URL the catalogue
+lists, and both now resolve to their sublayers.
 
 ### `gold.layer_geojson(dataset_id, bbox, max_features)` → `FeatureCollection`
 

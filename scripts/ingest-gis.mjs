@@ -64,6 +64,18 @@ const CLEARED = new Set([
 
 // Layers worth holding a local copy of: the ones a duty officer needs when the
 // network is the thing that is broken.
+// An entry is either a dataset id, or an id plus the sublayers to pull.
+//
+// Two of these are not queryable at the URL the catalogue lists, which is not a
+// mistake in the catalogue — it is how ArcGIS works:
+//
+//   fault-hazard-overlay  is a *group layer*. Group layers hold no features;
+//                         the four named faults beneath it do, and one of them
+//                         is the Wellington Fault.
+//   flood-hazard-areas    is a *service root*. You query a layer, not a service.
+//
+// Both answered "Invalid or missing input parameters" and a 400 until asked
+// properly.
 const MIRROR = [
   'community-emergency-hubs',
   'emergency-water-tanks',
@@ -73,20 +85,24 @@ const MIRROR = [
   'overland-flowpath',
   'stream-corridor',
   'liquefaction-overlay',
-  'fault-hazard-overlay',
   'active-faults',
+  { id: 'fault-hazard-overlay', sublayers: [46, 47, 48, 49] },
+  // 1% AEP — the one-in-a-hundred-year extent, which is the one people mean.
+  { id: 'flood-hazard-areas', sublayers: [2, 3] },
 ]
+
+const mirrorId = (m) => (typeof m === 'string' ? m : m.id)
+const mirrorIds = MIRROR.map(mirrorId)
+const mirrorEntry = (id) => MIRROR.find((m) => mirrorId(m) === id)
 
 // Catalogued, deliberately not mirrored:
 //
 //   landslide-features   over 20,000 polygons across the city. A partial mirror
 //                        is worse than none — it draws hazard over half of
 //                        Wellington and looks complete. Query it live.
-//   fault-hazard-overlay these two rejected the bbox query on the day
-//   flood-hazard-areas   (400 / "Invalid or missing input parameters"). The
-//                        failures are recorded in silver.source_snapshot and
-//                        surface as lastFetchError in the public catalogue,
-//                        rather than being quietly dropped.
+//
+// Any fetch that still fails is recorded in silver.source_snapshot and surfaces
+// as lastFetchError in the public catalogue, rather than being quietly dropped.
 
 // ---------------------------------------------------------------------------
 // Generalisation
@@ -182,7 +198,7 @@ async function loadCatalogue() {
 function classify(d) {
   const layerKind = d.raster_only ? 'raster' : d.link_type === 'arcgis_rest' ? 'feature' : 'other'
   const queryable = Boolean(d.feature_queryable) && !d.raster_only
-  const tier = MIRROR.includes(d.id) && queryable ? 'geometry' : layerKind === 'raster' ? 'image' : 'metadata'
+  const tier = mirrorIds.includes(d.id) && queryable ? 'geometry' : layerKind === 'raster' ? 'image' : 'metadata'
   return { layerKind, queryable, tier }
 }
 
@@ -207,9 +223,47 @@ function queryUrl(base, offset) {
   return `${base.replace(/\/$/, '')}/query?${p}`
 }
 
+async function layerName(url) {
+  try {
+    const res = await fetch(`${url}?f=json`)
+    const j = await res.json()
+    return j.name || null
+  } catch {
+    return null
+  }
+}
+
 async function fetchLayer(dataset) {
+  const entry = mirrorEntry(dataset.id)
+  const subs = typeof entry === 'object' && entry.sublayers ? entry.sublayers : null
+
+  if (subs) {
+    const merged = []
+    let truncated = false
+    let lastUrl = ''
+    let status = null
+    for (const sub of subs) {
+      const url = `${dataset.service_root.replace(/\/$/, '')}/${sub}`
+      const name = await layerName(url)
+      const part = await fetchOne({ url }, 0)
+      part.features.forEach((f) => {
+        f.properties = { ...(f.properties || {}), sublayerId: sub, sublayer: name }
+      })
+      merged.push(...part.features)
+      truncated = truncated || part.truncated
+      lastUrl = part.url
+      status = part.status
+      await sleep(PAUSE_MS)
+    }
+    return { features: merged, truncated, url: lastUrl, status }
+  }
+
+  return fetchOne(dataset, 0)
+}
+
+async function fetchOne(dataset, startOffset) {
   const features = []
-  let offset = 0
+  let offset = startOffset
   let truncated = false
   let lastUrl = ''
   let status = null
@@ -291,7 +345,7 @@ w(
 )
 
 if (!catalogueOnly) {
-  const targets = datasets.filter((d) => MIRROR.includes(d.id) && classify(d).queryable)
+  const targets = datasets.filter((d) => mirrorIds.includes(d.id) && classify(d).queryable)
   console.error(`fetching ${targets.length} layers…`)
 
   for (const d of targets) {
