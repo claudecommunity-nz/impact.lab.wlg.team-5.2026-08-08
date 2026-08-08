@@ -136,6 +136,30 @@ open data already exported into this repo — is cleared. Everything else is
 mirrored into `silver` for our own spatial joins and refused by the public API.
 Adding to that list is a licence decision, made in `scripts/ingest-gis.mjs`.
 
+### `gold.report_hazard_context` → was this already a known hazard?
+
+`GET /rest/v1/report_hazard_context`
+`GET /rest/v1/hazard_context_summary`
+
+One row per report × mapped hazard area it falls inside, with the publisher
+whose model produced the finding. The summary view gives the operational read:
+
+> 8 of 28 reports fall inside a mapped hazard; 20 do not.
+
+The 20 are the interesting number. They are the city behaving in a way the
+planning layers did not predict, which is the case community reporting exists
+to catch.
+
+Two things to hold on to when using this:
+
+- **It is an inference.** A point inside a polygon does not mean the polygon
+  caused it. Every row carries `basis` saying so, and nothing here changes a
+  report's `verificationLevel`.
+- **It is computed against the exact location**, privately, inside `silver`. A
+  fuzzed 100m cell straddles hazard boundaries and would be wrong in both
+  directions. Only the yes/no is published — which is why this is a view over
+  `silver` and not something you could rebuild from `gold`.
+
 ## Writing
 
 ### `gold.submit_report(...)` → `jsonb`
