@@ -318,5 +318,12 @@ export function toReport(p: PublicReport): Report {
       note: event.note,
       by: event.by || 'unknown',
     })),
+
+    // Publishing is something this prototype does to its own reports. A report
+    // that arrived from the feed is already on the feed and was put there by
+    // somebody else, so there is nothing here to claim credit for.
+    publishedAt: null,
+    publishError: null,
+    publishedReference: null,
   }
 }

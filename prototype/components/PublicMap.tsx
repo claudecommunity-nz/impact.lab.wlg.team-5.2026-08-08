@@ -1,9 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import FixedIt from './FixedIt'
 import { formatWhen, relativeWhen } from '../lib/time'
 import type { PublicReport, StatusEvent } from '../lib/publicFeed'
-import type { Report, ReportGroup } from '../lib/types'
+import type { FixClaim, Report, ReportGroup } from '../lib/types'
 
 // The public read-only view of the shared reports feed.
 //
@@ -29,6 +30,7 @@ interface FeedResponse {
   reports: Report[]
   details: PublicReport[]
   groups: ReportGroup[]
+  claims: Record<string, FixClaim>
 }
 
 const REFRESH_MS = 15000
@@ -127,10 +129,16 @@ export default function PublicMap() {
             <Detail
               report={chosen}
               historyError={data?.historyError || null}
+              claim={data?.claims?.[chosen.reference] || null}
+              onClaimed={load}
               onClear={() => setSelected(null)}
             />
           ) : (
-            <List reports={data?.details || []} onSelect={setSelected} />
+            <List
+              reports={data?.details || []}
+              claims={data?.claims || {}}
+              onSelect={setSelected}
+            />
           )}
         </div>
       </div>
@@ -150,9 +158,11 @@ export default function PublicMap() {
 
 function List({
   reports,
+  claims,
   onSelect,
 }: {
   reports: PublicReport[]
+  claims: Record<string, FixClaim>
   onSelect: (reference: string) => void
 }) {
   if (!reports.length) {
@@ -177,6 +187,7 @@ function List({
             <span className="mt-2 flex flex-wrap items-center gap-1.5">
               <Tag>{report.statusLabel || report.status}</Tag>
               {report.isSynthetic && <Tag tone="warning">Test data</Tag>}
+              {claims[report.reference] && <Tag tone="claim">Reported fixed</Tag>}
             </span>
             {latestUpdate(report) && (
               <span className="mt-1.5 block text-xs text-grey-600">
@@ -198,10 +209,14 @@ function latestUpdate(report: PublicReport): StatusEvent | null {
 function Detail({
   report,
   historyError,
+  claim,
+  onClaimed,
   onClear,
 }: {
   report: PublicReport
   historyError: string | null
+  claim: FixClaim | null
+  onClaimed: () => void
   onClear: () => void
 }) {
   return (
@@ -245,6 +260,13 @@ function Detail({
       </dl>
 
       <Timeline report={report} historyError={historyError} />
+
+      <FixedIt
+        reference={report.reference}
+        claim={claim}
+        onClaimed={onClaimed}
+        source="feed"
+      />
 
       {report.ownershipNote && <p className="mt-3 hint">{report.ownershipNote}</p>}
     </div>
@@ -343,11 +365,18 @@ function Row({ label, value }: { label: string; value: string | null }) {
   )
 }
 
-function Tag({ children, tone }: { children: React.ReactNode; tone?: 'warning' }) {
+const TAG_TONES: Record<string, string> = {
+  warning: 'bg-warning-bg text-warning-fg',
+  // Outlined, not filled: someone said this is fixed, which is not the same
+  // kind of fact as the statuses beside it and should not look like one.
+  claim: 'border border-wcc-black bg-wcc-white text-wcc-black',
+}
+
+function Tag({ children, tone }: { children: React.ReactNode; tone?: 'warning' | 'claim' }) {
   return (
     <span
       className={`rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.04em] ${
-        tone === 'warning' ? 'bg-warning-bg text-warning-fg' : 'bg-grey-100 text-grey-700'
+        (tone && TAG_TONES[tone]) || 'bg-grey-100 text-grey-700'
       }`}
     >
       {children}

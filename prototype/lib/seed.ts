@@ -86,6 +86,9 @@ function report({
     status,
     statusNote,
     timeline,
+    publishedAt: null,
+    publishError: null,
+    publishedReference: null,
   }
 }
 
