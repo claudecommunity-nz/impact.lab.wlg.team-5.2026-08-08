@@ -3,6 +3,8 @@
 **Wellington City Council Emergency Management × Claude Code Community NZ**
 Saturday 8 August 2026 · Waimanga Room, Wellington City Council
 
+📊 **[Presentation deck](https://docs.google.com/presentation/d/1y97zDl2mwJnpQQqIXr4hBfJjDARNlMVSmTiF4cvz4Sc/edit?usp=sharing)**
+
 ---
 
 ## Problem 02 — Create a two-way information channel between communities and WCC
