@@ -34,6 +34,41 @@ export function feedUrl(): string {
   return process.env.REPORTS_FEED_URL || FALLBACK_FEED_URL
 }
 
+// The status trail lives in a table beside the RPC, not in the GeoJSON, so it
+// takes a second request. The URL is derived from the feed's rather than
+// configured separately, so one REPORTS_FEED_URL still moves the whole thing to
+// another database. Set REPORTS_HISTORY_URL if the two ever diverge.
+//
+// Selecting named columns rather than `*` is deliberate: `report?select=*`
+// against this database returns 57014, a statement timeout. Ask for what you
+// need.
+const HISTORY_COLUMNS =
+  'reference,status,statusLabel,note,actorRole,by,agencyCode,agency,externalTicketRef,at'
+
+export function historyUrl(): string {
+  const explicit = process.env.REPORTS_HISTORY_URL
+  if (explicit) return explicit
+
+  const url = new URL(feedUrl())
+  url.pathname = url.pathname.replace(/\/rpc\/[^/]+$/, '/report_status_history')
+  url.searchParams.set('select', HISTORY_COLUMNS)
+  url.searchParams.set('order', 'at.asc')
+  url.searchParams.set('limit', '1000')
+  return url.toString()
+}
+
+/** One entry in a report's status trail. */
+export interface StatusEvent {
+  status: string
+  statusLabel: string | null
+  note: string | null
+  actorRole: string | null
+  by: string | null
+  agency: string | null
+  externalTicketRef: string | null
+  at: string
+}
+
 export interface PublicReport {
   reference: string
   lat: number
@@ -75,16 +110,42 @@ export interface PublicReport {
   // is the one thing this whole channel must not do.
   isSynthetic: boolean
   disclaimer: string | null
+
+  /** Oldest first. Empty when the report has no trail, or when the history
+   *  request failed — read `historyError` before concluding it is the former. */
+  timeline: StatusEvent[]
 }
 
 export interface FeedResult {
   reports: PublicReport[]
   fetchedAt: string
   error: string | null
+  historyError: string | null
 }
 
 export async function fetchPublicReports(): Promise<FeedResult> {
   const fetchedAt = new Date().toISOString()
+
+  // Two independent requests. The history failing must not cost us the
+  // reports, so they are settled separately rather than in one try block.
+  const [feed, history] = await Promise.all([fetchFeed(), fetchHistory()])
+
+  if (feed.error) {
+    return { reports: [], fetchedAt, error: feed.error, historyError: history.error }
+  }
+
+  for (const report of feed.reports) {
+    // A trail may exist for a reference that is not in the GeoJSON — the two
+    // requests are a moment apart and reports arrive between them. Attaching by
+    // lookup rather than merging both ways drops those instead of inventing a
+    // report with no coordinates to draw.
+    report.timeline = history.byReference.get(report.reference) || []
+  }
+
+  return { reports: feed.reports, fetchedAt, error: null, historyError: history.error }
+}
+
+async function fetchFeed(): Promise<{ reports: PublicReport[]; error: string | null }> {
   try {
     const res = await fetch(feedUrl(), { cache: 'no-store' })
     if (!res.ok) throw new Error(`Feed responded ${res.status}`)
@@ -96,15 +157,55 @@ export async function fetchPublicReports(): Promise<FeedResult> {
       if (report) reports.push(report)
     }
     reports.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
-    return { reports, fetchedAt, error: null }
+    return { reports, error: null }
   } catch (err) {
     // An empty map with a visible reason beats a map that silently shows
     // nothing and looks like a quiet night.
-    return {
-      reports: [],
-      fetchedAt,
-      error: err instanceof Error ? err.message : String(err),
+    return { reports: [], error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+async function fetchHistory(): Promise<{
+  byReference: Map<string, StatusEvent[]>
+  error: string | null
+}> {
+  const byReference = new Map<string, StatusEvent[]>()
+  try {
+    const res = await fetch(historyUrl(), { cache: 'no-store' })
+    if (!res.ok) throw new Error(`Status history responded ${res.status}`)
+
+    const rows: unknown = await res.json()
+    if (!Array.isArray(rows)) throw new Error('Status history was not a list')
+
+    for (const row of rows as Record<string, unknown>[]) {
+      const reference = str(row.reference)
+      const at = str(row.at)
+      if (!reference || !at) continue
+
+      const entry: StatusEvent = {
+        status: str(row.status) || 'unknown',
+        statusLabel: str(row.statusLabel),
+        note: str(row.note),
+        actorRole: str(row.actorRole),
+        by: str(row.by),
+        agency: str(row.agency),
+        externalTicketRef: str(row.externalTicketRef),
+        at,
+      }
+      const existing = byReference.get(reference)
+      if (existing) existing.push(entry)
+      else byReference.set(reference, [entry])
     }
+
+    // The query asks for `order=at.asc`, but the ordering is what the timeline
+    // means — sort locally too rather than trust a query string.
+    for (const entries of byReference.values()) {
+      entries.sort((a, b) => a.at.localeCompare(b.at))
+    }
+
+    return { byReference, error: null }
+  } catch (err) {
+    return { byReference, error: err instanceof Error ? err.message : String(err) }
   }
 }
 
@@ -156,6 +257,7 @@ function toPublicReport(feature: Feature<Point>): PublicReport | null {
     verificationLevel: str(p.verificationLevel),
     isSynthetic: p.isSynthetic === true,
     disclaimer: str(p.disclaimer),
+    timeline: [], // attached from the history table by fetchPublicReports.
   }
 }
 
@@ -210,6 +312,11 @@ export function toReport(p: PublicReport): Report {
     submittedAt: p.submittedAt,
     status: STATUS_EQUIVALENT[p.status] || 'received',
     statusNote: p.statusNote,
-    timeline: [],
+    timeline: p.timeline.map((event) => ({
+      at: event.at,
+      status: STATUS_EQUIVALENT[event.status] || 'received',
+      note: event.note,
+      by: event.by || 'unknown',
+    })),
   }
 }

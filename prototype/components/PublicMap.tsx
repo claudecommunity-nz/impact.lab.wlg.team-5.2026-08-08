@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatWhen, relativeWhen } from '../lib/time'
-import type { PublicReport } from '../lib/publicFeed'
+import type { PublicReport, StatusEvent } from '../lib/publicFeed'
 import type { Report, ReportGroup } from '../lib/types'
 
 // The public read-only view of the shared reports feed.
@@ -25,6 +25,7 @@ interface FeedResponse {
   disclaimer: string | null
   fetchedAt: string
   error: string | null
+  historyError: string | null
   reports: Report[]
   details: PublicReport[]
   groups: ReportGroup[]
@@ -123,7 +124,11 @@ export default function PublicMap() {
 
         <div className="card overflow-hidden">
           {chosen ? (
-            <Detail report={chosen} onClear={() => setSelected(null)} />
+            <Detail
+              report={chosen}
+              historyError={data?.historyError || null}
+              onClear={() => setSelected(null)}
+            />
           ) : (
             <List reports={data?.details || []} onSelect={setSelected} />
           )}
@@ -169,10 +174,16 @@ function List({
             </span>
             <span className="mt-1 block font-semibold">{report.faultLabel || report.faultType}</span>
             <span className="block text-sm text-grey-600">{report.suburb || 'Unknown suburb'}</span>
-            <span className="mt-2 flex flex-wrap gap-1.5">
+            <span className="mt-2 flex flex-wrap items-center gap-1.5">
               <Tag>{report.statusLabel || report.status}</Tag>
               {report.isSynthetic && <Tag tone="warning">Test data</Tag>}
             </span>
+            {latestUpdate(report) && (
+              <span className="mt-1.5 block text-xs text-grey-600">
+                {report.timeline.length} update{report.timeline.length === 1 ? '' : 's'} — last by{' '}
+                {latestUpdate(report)?.by}, {relativeWhen(latestUpdate(report)?.at)}
+              </span>
+            )}
           </button>
         </li>
       ))}
@@ -180,7 +191,19 @@ function List({
   )
 }
 
-function Detail({ report, onClear }: { report: PublicReport; onClear: () => void }) {
+function latestUpdate(report: PublicReport): StatusEvent | null {
+  return report.timeline.length ? report.timeline[report.timeline.length - 1] : null
+}
+
+function Detail({
+  report,
+  historyError,
+  onClear,
+}: {
+  report: PublicReport
+  historyError: string | null
+  onClear: () => void
+}) {
   return (
     <div className="max-h-[44rem] overflow-y-auto p-5">
       <div className="flex items-start justify-between gap-3">
@@ -221,16 +244,91 @@ function Detail({ report, onClear }: { report: PublicReport; onClear: () => void
         <Row label="Photos" value={report.photoCount ? `${report.photoCount}` : null} />
       </dl>
 
-      {report.statusNote && (
-        <p className="mt-4 border-t border-grey-200 pt-3 text-sm">
-          <strong>Latest update:</strong> {report.statusNote}
-          {report.statusUpdatedAt && (
-            <span className="text-muted"> — {formatWhen(report.statusUpdatedAt)}</span>
-          )}
-        </p>
-      )}
+      <Timeline report={report} historyError={historyError} />
 
       {report.ownershipNote && <p className="mt-3 hint">{report.ownershipNote}</p>}
+    </div>
+  )
+}
+
+// What has actually happened to the report, from the feed's own status trail.
+//
+// Chronological, oldest first, because that is the shape of the question a
+// reporter is asking — what happened after I sent this. Every entry names who
+// moved it, and `actorRole` distinguishes a status the system set on receipt
+// from one a duty officer or a partner agency set deliberately.
+function Timeline({
+  report,
+  historyError,
+}: {
+  report: PublicReport
+  historyError: string | null
+}) {
+  const events = report.timeline
+
+  if (!events.length) {
+    return (
+      <div className="mt-4 border-t border-grey-200 pt-3">
+        <h3 className="text-sm font-semibold">What has happened</h3>
+        {historyError ? (
+          <p className="mt-1 text-sm text-error-fg">
+            The status history did not load — <span className="ref">{historyError}</span>. This is
+            not the same as nothing having happened.
+          </p>
+        ) : (
+          <p className="mt-1 hint">No status updates recorded on the feed.</p>
+        )}
+        {report.statusNote && <p className="mt-2 text-sm">{report.statusNote}</p>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-4 border-t border-grey-200 pt-3">
+      <h3 className="text-sm font-semibold">
+        What has happened{' '}
+        <span className="font-normal text-muted">
+          ({events.length} update{events.length === 1 ? '' : 's'})
+        </span>
+      </h3>
+
+      <ol className="mt-3 space-y-3">
+        {events.map((event, i) => {
+          const current = i === events.length - 1
+          return (
+            <li key={`${event.at}-${i}`} className="grid grid-cols-[auto_1fr] gap-3">
+              <span aria-hidden="true" className="flex flex-col items-center pt-1">
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${
+                    current ? 'bg-wcc-black' : 'bg-grey-300'
+                  }`}
+                />
+                {i < events.length - 1 && <span className="mt-1 w-px flex-1 bg-grey-300" />}
+              </span>
+
+              <div className="pb-1 text-sm">
+                <p className={current ? 'font-semibold' : 'font-medium'}>
+                  {event.statusLabel || event.status}
+                  {current && (
+                    <span className="ml-2 text-xs font-normal text-muted">Current</span>
+                  )}
+                </p>
+                <p className="text-xs text-muted">
+                  {formatWhen(event.at)} — {event.by || 'unknown'}
+                  {event.actorRole === 'system' && ' (automatic)'}
+                  {event.agency && event.agency !== event.by && ` · ${event.agency}`}
+                </p>
+                {event.note && <p className="mt-1">{event.note}</p>}
+                {event.externalTicketRef && (
+                  <p className="mt-1 text-xs text-muted">
+                    Ticket <span className="ref">{event.externalTicketRef}</span>
+                  </p>
+                )}
+              </div>
+            </li>
+          )
+        })}
+      </ol>
     </div>
   )
 }

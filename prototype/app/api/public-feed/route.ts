@@ -13,12 +13,13 @@ import { fetchPublicReports, toReport } from '../../../lib/publicFeed'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const { reports, fetchedAt, error } = await fetchPublicReports()
+  const { reports, fetchedAt, error, historyError } = await fetchPublicReports()
   const local = reports.map(toReport)
 
   return NextResponse.json({
     count: reports.length,
     syntheticCount: reports.filter((r) => r.isSynthetic).length,
+    historyError,
     // The feed states its own terms of use on every feature. Carry the first
     // one through rather than writing our own words over the publisher's.
     disclaimer: reports.find((r) => r.disclaimer)?.disclaimer || null,
