@@ -175,21 +175,44 @@ it is harmless.
 
 ## Known contract breaks
 
-Live as of 8 August 2026 — see [workflow-gaps.md](workflow-gaps.md) for the full
-list and fixes.
+Closed as of 8 August 2026:
 
-- **`report_receipt` lost `timeline`** (renamed `history`), plus `legacyStatus`,
-  `statusNote`, `faultType` and `severity`. `prototype/components/Tracker.tsx`
-  reads `timeline` and `statusNote`.
-- **`intake_blocked` is `false` for every category**, so `submit_report()`
-  currently accepts life-safety reports it is documented to refuse.
-- **The service role has no `usage` on schema `gold`**, so `advance_status` is
-  unreachable by the console.
-- **Nothing in `gold` sets priority or ownership.** They are read-only over the
-  API.
+- ~~`report_receipt` lost `timeline`~~ — fixed in `20260808000010`. It now
+  returns the trail as **`timeline`** in the `TimelineEntry` shape
+  (`at`, `status`, `legacyStatus`, `statusLabel`, `note`, `by`,
+  `externalTicketRef`), alongside `legacyStatus`, `statusNote`, `faultType` and
+  `severity`. The old `history` key is still returned, holding the same array,
+  so nothing that already reads it breaks. Lookup is case-insensitive.
+- ~~`intake_blocked` is `false` for every category~~ — fixed in
+  `20260808000011`. `assistance` and `building-damage` now refuse at intake with
+  a message telling the reporter to call 111. The contact-centre categories
+  (`biohazard`, `water-out`, `power-out`) are deliberately still accepted: they
+  are urgent but not life-safety, and a late report of a burst main is still
+  worth having.
+- ~~The service role has no `usage` on schema `gold`~~ — fixed in
+  `20260808000010`. `service_role` has `usage`, `select` and `execute` across
+  `gold`. `advance_status` is granted to `service_role` **only** — `anon` and
+  `authenticated` are explicitly revoked, because moving a report to
+  "Completed & confirmed" is a Council statement about the world.
+
+Still open:
+
+- **Nothing in `gold` sets priority or ownership.** Both are read-only over the
+  API; triage happens in `silver`. See [workflow-gaps.md](workflow-gaps.md).
+
+## One more thing worth knowing
+
+`gold` is listed **first** in `supabase/config.toml`, so it is PostgREST's
+default profile. `GET /rest/v1/report` works with no `Accept-Profile` header.
+The safe schema is the default one; you have to go out of your way to ask for
+anything else, and `silver` is not askable at all.
 
 ---
 
-**Verified against:** `supabase/migrations/20260808000004`–`20260808000009`
-applied to a clean database and exercised as `anon` and `service_role` —
-8 August 2026.
+**Verified against:** `supabase/migrations/20260808000001`–`20260808000011`
+applied to a clean database and exercised over HTTP as `anon` and
+`service_role` — 8 August 2026. Round trip confirmed: `anon` submits with
+contact details and gets a reference, none of those details reach `gold`, the
+description is held at `withheld_pending_review`, `service_role` walks the
+report to Completed & confirmed, and `anon` reads the whole trail back from the
+reference in lower case.
