@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-council-sand text-council-ink antialiased;
+  }
+}
+
+@layer components {
+  .field {
+    @apply w-full rounded border border-council-line bg-white px-3 py-2 text-base
+           outline-none focus:border-council-accent focus:ring-2 focus:ring-council-accent/30;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded px-4 py-2.5 text-sm
+           font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-council-accent text-white hover:bg-council-accent/90;
+  }
+
+  .btn-secondary {
+    @apply btn border border-council-line bg-white text-council-ink hover:bg-council-sand;
+  }
+
+  .card {
+    @apply rounded-lg border border-council-line bg-white;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-semibold text-council-ink;
+  }
+
+  .hint {
+    @apply text-sm text-council-ink/60;
+  }
+
+  .error {
+    @apply mt-1 text-sm font-medium text-urgent;
+  }
+}
