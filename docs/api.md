@@ -7,6 +7,41 @@
 Everything here lives in the `gold` schema, which PostgREST serves at
 `/rest/v1/`. `silver` is not on the exposed list and has no URL.
 
+## Live
+
+```
+https://npgheigsdikccoknmbup.supabase.co/rest/v1/
+```
+
+Every request needs an `apikey` header. The anon key is in
+[`.env.example`](../.env.example) and is safe in a browser — it can read `gold`
+and file a report, and nothing else.
+
+```bash
+curl -s https://npgheigsdikccoknmbup.supabase.co/rest/v1/hazard_context_summary   -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY"
+```
+
+`gold` is the default schema, so no `Accept-Profile` header is needed.
+
+Verify the deployment rather than trusting it:
+
+```bash
+npm run check -- https://npgheigsdikccoknmbup.supabase.co "$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+```
+
+**One trap worth knowing.** `supabase/config.toml` configures the *local* stack
+only. A hosted project starts with `gold` unexposed, so every URL here 404s
+until the `authenticator` role is told about it:
+
+```sql
+alter role authenticator set pgrst.db_schemas = 'gold, public, graphql_public';
+notify pgrst, 'reload config';
+```
+
+This has been applied to the project above. It has to be re-applied to any new
+one, and it is not carried by `db push` — migrations cannot alter a role that
+belongs to the platform.
+
 ## Reading
 
 ### `gold.reports_geojson(...)` → `FeatureCollection`
