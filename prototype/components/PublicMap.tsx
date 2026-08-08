@@ -1,19 +1,23 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import ReportMap from './ReportMap'
-import { emptyCollection, countBySuburb } from '../lib/layers'
-import type { SuburbCollection } from '../lib/layers'
 import { formatWhen, relativeWhen } from '../lib/time'
 import type { PublicReport } from '../lib/publicFeed'
-import type { BoundaryLayerToggles, Report, ReportGroup } from '../lib/types'
+import type { Report, ReportGroup } from '../lib/types'
 
 // The public read-only view of the shared reports feed.
 //
-// Same map component the Council console uses, so residents and duty officers
-// are looking at the same picture. What is different is what you can do with
-// it: there is no status control here, because the feed is an RPC that returns
-// GeoJSON and there is nowhere to write back to.
+// The map is the Council's published ArcGIS app, embedded. Worth being plain
+// about what that costs: it draws its own layers — suburb boundaries, public
+// toilets, Community Emergency Hubs — and it cannot draw the community reports
+// on this page, because a cross-origin iframe will not take a data source from
+// us. So the reports are the list beside it, not pins on it.
+//
+// What still ties the two together is selection: picking a report recentres the
+// embedded map on its coordinates. That is one-way. Nothing done inside the
+// map comes back out.
+const NEARBY_APP =
+  'https://www.arcgis.com/apps/instant/nearby/index.html?appid=8220d135781b45e7b4f236288fd852aa'
 
 interface FeedResponse {
   count: number
@@ -32,12 +36,6 @@ export default function PublicMap() {
   const [data, setData] = useState<FeedResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
-  const [suburbs, setSuburbs] = useState<SuburbCollection>(emptyCollection() as SuburbCollection)
-  const [layers, setLayers] = useState<BoundaryLayerToggles>({
-    suburbs: true,
-    parcels: false,
-    hubs: false,
-  })
 
   const load = useCallback(async () => {
     try {
@@ -56,20 +54,17 @@ export default function PublicMap() {
     return () => clearInterval(timer)
   }, [load])
 
-  const reports = data?.reports || []
-  const groups = data?.groups || []
   const details = useMemo(
     () => new Map((data?.details || []).map((d) => [d.reference, d])),
     [data],
   )
 
-  const suburbCounts = useMemo(
-    () => (suburbs.features?.length ? countBySuburb(reports, suburbs) : new Map<string, number>()),
-    [reports, suburbs],
-  )
-
   const chosen = selected ? details.get(selected) || null : null
   const error = loadError || data?.error || null
+
+  // Instant Apps honour these when URL parameters are enabled; if this one does
+  // not, it opens at its own extent and the rest of the page is unaffected.
+  const src = chosen ? `${NEARBY_APP}&center=${chosen.lng},${chosen.lat}&level=17` : NEARBY_APP
 
   return (
     <div>
@@ -79,9 +74,9 @@ export default function PublicMap() {
         </h1>
         <span aria-hidden="true" className="rule-yellow mt-4" />
         <p className="mt-4 max-w-measure text-lg">
-          Community reports on the shared feed, on the same map the Council console uses. This page
-          only reads — nothing here is a Council decision, and no status on it was set by anyone at
-          the Council.
+          Community reports on the shared feed, alongside the Council&apos;s published map of local
+          resources. This page only reads — nothing here is a Council decision, and no status on it
+          was set by anyone at the Council.
         </p>
       </header>
 
@@ -92,7 +87,7 @@ export default function PublicMap() {
           </h2>
           <p className="mt-2 max-w-measure text-sm">
             The feed flags them <span className="ref">isSynthetic</span> and they are marked below.
-            They were generated to fill the map, not observed by anyone. Do not read them as
+            They were generated to fill the feed, not observed by anyone. Do not read them as
             conditions on the ground.
           </p>
         </div>
@@ -102,36 +97,28 @@ export default function PublicMap() {
         <div role="alert" className="mt-6 border-t-rule border-error-fg bg-error-bg p-6">
           <h2 className="text-xl font-semibold text-error-fg">The feed did not load</h2>
           <p className="mt-2 max-w-measure text-sm">
-            <span className="ref">{error}</span> — the map below is showing whatever loaded last,
+            <span className="ref">{error}</span> — the list below is showing whatever loaded last,
             which may be nothing at all. It is not evidence that there is nothing happening.
           </p>
         </div>
       )}
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_24rem]">
-        <div className="card relative h-[34rem] overflow-hidden lg:h-[44rem]">
-          <ReportMap
-            reports={reports}
-            groups={groups}
-            selected={selected}
-            onSelect={setSelected}
-            layers={layers}
-            suburbCounts={suburbCounts}
-            onSuburbs={setSuburbs}
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_26rem]">
+        <div>
+          <iframe
+            src={src}
+            title="Find your local community resources — Wellington City Council"
+            className="h-[34rem] w-full rounded border border-grey-300 lg:h-[44rem]"
+            referrerPolicy="no-referrer-when-downgrade"
+            allow="geolocation"
           />
-          <div className="absolute left-3 top-3 max-w-[16rem] rounded border border-grey-300 bg-wcc-white p-3 shadow-sm">
-            <h2 className="text-sm font-semibold">Map layers</h2>
-            <div className="mt-2 space-y-1.5">
-              <Toggle
-                id="suburbs"
-                label="Suburb boundaries"
-                layers={layers}
-                setLayers={setLayers}
-              />
-              <Toggle id="hubs" label="Community Emergency Hubs" layers={layers} setLayers={setLayers} />
-              <Toggle id="parcels" label="Property boundaries" layers={layers} setLayers={setLayers} />
-            </div>
-          </div>
+          <p className="mt-2 max-w-measure hint">
+            The Council&apos;s published map, embedded. It shows its own layers — suburb boundaries,
+            public toilets and Community Emergency Hubs.{' '}
+            <strong>The community reports are not on it.</strong> They are the list on the right,
+            because an embedded map cannot take a data source from this page. Choosing a report
+            recentres the map on where it was reported.
+          </p>
         </div>
 
         <div className="card overflow-hidden">
@@ -149,34 +136,10 @@ export default function PublicMap() {
       </p>
       {data && (
         <p className="mt-1 hint">
-          Feed read {formatWhen(data.fetchedAt)}, then every {REFRESH_MS / 1000} seconds. Grouping on
-          the map is inferred from fault type and proximity, not confirmed as one incident.
+          Feed read {formatWhen(data.fetchedAt)}, then every {REFRESH_MS / 1000} seconds.
         </p>
       )}
     </div>
-  )
-}
-
-function Toggle({
-  id,
-  label,
-  layers,
-  setLayers,
-}: {
-  id: keyof BoundaryLayerToggles
-  label: string
-  layers: BoundaryLayerToggles
-  setLayers: (next: BoundaryLayerToggles) => void
-}) {
-  return (
-    <label className="flex items-center gap-2 text-sm">
-      <input
-        type="checkbox"
-        checked={layers[id]}
-        onChange={(e) => setLayers({ ...layers, [id]: e.target.checked })}
-      />
-      {label}
-    </label>
   )
 }
 
@@ -244,6 +207,7 @@ function Detail({ report, onClear }: { report: PublicReport; onClear: () => void
       <dl className="mt-4 space-y-2 text-sm">
         <Row label="Where" value={report.address} />
         <Row label="Suburb" value={report.suburb} />
+        <Row label="Coordinates" value={`${report.lat.toFixed(5)}, ${report.lng.toFixed(5)}`} />
         <Row label="Location precision" value={report.locationPrecision} />
         <Row label="Observed" value={formatWhen(report.observedAt)} />
         <Row label="Submitted" value={formatWhen(report.submittedAt)} />
