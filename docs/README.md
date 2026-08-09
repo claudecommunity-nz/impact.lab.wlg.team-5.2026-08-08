@@ -23,6 +23,13 @@ Every doc ends with a **Verified against** line: the files it was last read
 against, and when. If you touch a doc, update that line. If you read a doc and
 the line is stale, trust the code and fix the doc.
 
+**Say whether you read it or ran it.** These are different claims and the
+difference has already bitten once — `intake_blocked` was documented as working
+while every row had it `false`. A migration read from source is documented
+intent; a migration applied to a clean database and exercised over HTTP is a
+fact. Migrations `0001`–`0011` are the second kind. `0012`–`0017` are currently
+the first, and every doc that describes them says so.
+
 Two failure modes worth naming, because both have already nearly happened
 today:
 
@@ -44,7 +51,7 @@ today:
 - **[classification.md](classification.md)** — WCC ownership and the 1–4 triage
   priority.
 - **[workflow-gaps.md](workflow-gaps.md)** — **read this first if you are
-  picking up work.** What is verified working end to end, and the seven things
+  picking up work.** What is verified working end to end, and the five things
   that are not, each with the fix.
 - **[decisions.md](decisions.md)** — the choices worth remembering, dated.
 
@@ -60,5 +67,6 @@ From [CLAUDE.md](../CLAUDE.md), repeated because they are easy to lose at speed:
 
 ---
 
-**Verified against:** `supabase/migrations/*` (0001–0007), `supabase/config.toml`,
-`prototype/` — 8 August 2026.
+**Verified against:** `supabase/migrations/*` (0001–0017), `supabase/config.toml`,
+`supabase/seed.sql`, `prototype/` — 8 August 2026. Migrations `0012`–`0017` read
+from source, not applied; `0017` is not yet committed.

@@ -85,7 +85,7 @@ enabled = true
 # more when the council servers are the thing that is slow.
 #
 # Regenerate with: npm run seed:build && npm run gis:fetch
-sql_paths = ["./seed.sql", "./gis-ingest.sql"]
+sql_paths = ["./seed.sql", "./gis-ingest.sql", "./event-e08.sql"]
 
 [db.network_restrictions]
 # Enable management of network restrictions.

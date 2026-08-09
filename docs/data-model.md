@@ -14,7 +14,15 @@ Migrations apply in filename order:
 | `20260808000005_gold_rpc.sql` | The API surface — see [api.md](api.md) |
 | `20260808000006_grants.sql` | Privileges, and deliberately what is *not* granted |
 | `20260808000007_clustering.sql` | DBSCAN grouping and the corroboration promotion |
-| `20260808000008`, `20260808000009` | Ownership and priority — **in flight**, see [classification.md](classification.md) |
+| `20260808000008`, `20260808000009` | Ownership and priority — see [classification.md](classification.md) |
+| `20260808000010_service_role_and_receipt.sql` | `service_role` reaches `gold`; `report_receipt` regains `timeline` |
+| `20260808000011_block_life_safety_intake.sql` | `assistance` and `building-damage` refuse at intake |
+| `20260808000012_gis_datasets.sql` | The 74-dataset catalogue and the mirrored layers |
+| `20260808000013_layer_geojson_definer.sql` | `layer_geojson` as `security definer`, with the licence refusal |
+| `20260808000014_hazard_context.sql` | Reports × mapped hazard areas, computed on the exact point inside `silver` |
+| `20260808000015_consolidate_fault_types.sql` | Three category pairs merged; old codes retired as aliases |
+| `20260808000016_triage_endpoint_and_scope.sql` | `gold.triage_report`; `silver.wcc_scope` and `gold.scope_audit` |
+| `20260808000017_category_help_text.sql` | `help_text` on categories; `alsoCovers`; `gold.report_category` |
 
 ## Enums
 
@@ -53,15 +61,39 @@ and that should be a row edit.
 **`service`** — mirrors `SERVICES` in `prototype/lib/taxonomy.ts` one for one so
 the form and the database cannot drift.
 
-**`fault_type`** — does four jobs at once: the label a reporter sees, the agency
-a report routes to (`default_agency_code`), how coarsely its location may be
-published (`default_precision`), and whether this channel accepts it at all
-(`intake_blocked`, `intake_block_reason`).
+**`fault_type`** — the busiest table in the schema. It carries the label and
+`help_text` a reporter sees, the agency a report routes to
+(`default_agency_code`), how coarsely its location may be published
+(`default_precision`), whether this channel accepts it at all (`intake_blocked`,
+`intake_block_reason`), who owns the job (`ownership`, `partner_agency_code`,
+`ownership_note`, `default_priority` — see
+[classification.md](classification.md)), and whether the category is still live
+(`is_active`, `superseded_by`).
+
+**`superseded_by`** is what makes a category merge non-breaking. A retired code
+keeps its row, goes `is_active = false`, and points at what it became.
+`gold.submit_report` resolves the pointer, so a client built against the old list
+still files successfully and is told the code moved. Deleting the row instead
+would have broken every integration on the day.
+
+**`help_text`** is one line under the label, written in a reporter's words. It
+became necessary the moment categories merged: "Surface flooding" does not read
+as covering waves over a sea wall, and someone at Island Bay who scans the list
+without seeing their situation either picks the wrong box or gives up. Both cost
+WCC the report.
 
 **`hub`** — 36 real Community Emergency Hubs from GWRC Open Data, filtered to
 Wellington City. A report's hub is a foreign key, so "Newtown Community
 Emergency Hub" always means the same place. Source and source URL are columns,
 not comments, so attribution travels with the data.
+
+**`wcc_scope`** — what WCC said it owns, recorded as data on 8 August 2026, one
+row per category with the wording Council used (`as_stated`) and a `source`.
+This is the reference `gold.scope_audit` compares the live classification
+against, so that a category quietly acquiring `wcc_lead` shows up instead of
+putting Council's name on a job Council never accepted. Where a row is *our*
+reading rather than WCC's — `hub-status` — the `source` column says so outright.
+No anon access: it is the yardstick, and the audit view is the published half.
 
 ### `report`
 
@@ -150,6 +182,8 @@ Views, not tables. See [api.md](api.md) for the full published shape.
 | `gold.report_status_history` | The trail, keyed by reference |
 | `gold.report_cluster` | Grouped reports, centroid always at `zone_100m` regardless of the fault type underneath |
 | `gold.agency`, `gold.service`, `gold.fault_type`, `gold.hub` | Reference data, so a client can build its own form and anyone can check the coarsening rules before dropping a pin |
+| `gold.report_category` | Active categories flattened against their service, for building a form in one request |
+| `gold.scope_audit` | Live emergency categories against `silver.wcc_scope`, so classification drift is visible rather than blocked |
 
 Two things every `gold.report` row carries that a careless consumer cannot strip
 by accident: `isSynthetic` and `disclaimer`.
@@ -157,17 +191,26 @@ by accident: `isSynthetic` and `disclaimer`.
 ## Seed data
 
 `supabase/seed.sql` is **generated** — edit `scripts/build-seed.mjs` and
-regenerate. It truncates the reference and report tables and reloads them:
-agencies, services, fault types, 36 real hubs, and 28 invented reports
-describing a hypothetical southerly. No real person is named and every seeded
-report carries `is_synthetic = true`, which travels all the way into gold.
+regenerate. It loads 36 real hubs and 28 invented reports describing a
+hypothetical southerly. No real person is named and every seeded report carries
+`is_synthetic = true`, which travels all the way into gold.
 
-Because the seed truncates `fault_type`, `service` and `agency` on every
-`supabase db reset`, **reference data must be seeded through the generator, not
-inserted by a migration** — a migration's rows would be wiped by the seed that
-runs after it.
+**Reference data belongs in a migration, not the seed.** This reversed once and
+the reversal is the point: the seed used to truncate `fault_type`, `service` and
+`agency`, so a migration's rows were wiped by the seed that ran after it. That
+was fixed by narrowing the truncate — `seed.sql` now clears **reports, clusters,
+status events, photos and hubs only**, and says so in its own header. WCC's
+ownership and priority classification lives in
+`20260808000009_reference_seed.sql` and must survive a `db reset`; a Council
+judgement should not be discarded by reseeding demo data.
+
+So: a new category, a label change, an ownership call or a `help_text` edit is a
+**migration**. Migrations `0015`, `0016` and `0017` all write reference rows
+directly, which is now correct. See [decisions.md](decisions.md) entries 10 and
+10a for the round trip.
 
 ---
 
-**Verified against:** `supabase/migrations/20260808000001`–`20260808000014`,
-`supabase/seed.sql` (header and reference sections) — 8 August 2026.
+**Verified against:** `supabase/migrations/20260808000001`–`20260808000017`,
+`supabase/seed.sql` (header and truncate list) — 8 August 2026. Migrations
+`0015`–`0017` were read from source, not applied; `0017` is not yet committed.

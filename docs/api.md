@@ -92,7 +92,7 @@ reference is the capability**, which is why it is random rather than sequential.
   "statusLabel": "Responding",
   "statusNote": "…",
   "assignedAgency": "Tiaki Wai",
-  "faultType": "flooding",
+  "faultType": "surface-flood",
   "faultLabel": "Surface flooding",
   "suburb": "Hataitai",
   "severity": "disruption",
@@ -112,10 +112,43 @@ mistyped reference reads as "we don't have that" rather than a stack trace.
 ### Views
 
 `gold.report`, `gold.report_status_history`, `gold.report_cluster`, `gold.hub`,
-`gold.agency`, `gold.service`, `gold.fault_type` are all directly selectable at
-`/rest/v1/<view>`. Property names are camelCase and match what
-`prototype/app/api/feed` already emits, so an existing consumer needs no
-changes.
+`gold.agency`, `gold.service`, `gold.fault_type`, `gold.report_category` and
+`gold.scope_audit` are all directly selectable at `/rest/v1/<view>`. Property
+names are camelCase and match what `prototype/app/api/feed` already emits, so an
+existing consumer needs no changes.
+
+#### `gold.fault_type` — every category, live and retired
+
+Filter on `isActive` to build a form. The rest of the row is there so a client
+can explain itself:
+
+| Property | |
+|---|---|
+| `helpText` | One line under the label, in a reporter's words rather than Council's |
+| `alsoCovers` | Labels of the retired categories that now resolve here. **Derived** from `supersededBy`, so it cannot fall out of sync |
+| `supersededBy` | Set on a retired code, naming what it became. An old client reads this to find out its code moved |
+| `isActive` | False for retired codes. They are still *accepted* at intake — see `submit_report` below |
+| `ownership`, `ownershipNote`, `defaultPriority` | See [classification.md](classification.md) |
+| `intakeBlocked`, `intakeBlockReason` | Life-safety categories, refused at the database |
+
+`gold.report_category` is the same list flattened against its service —
+`code`, `label`, `helpText`, `serviceLabel`, `serviceBlurb`, `sortOrder` — for
+building a form in one request. Active categories only.
+
+#### `gold.scope_audit` — published ownership vs what WCC actually said
+
+One row per live emergency category, comparing `ownershipPublished` against
+`ownershipScopedByWcc`, with `asStatedByWcc`, a `source`, and a `finding` of
+`matches`, `published ownership differs from WCC's stated scope`,
+`not in WCC's stated scope`, or `claims WCC lead but is not in WCC's stated
+scope`.
+
+Published as a view rather than enforced as a constraint, deliberately: during a
+build the classification is still moving, and a constraint that blocks a
+legitimate edit gets dropped rather than obeyed. Drift is meant to be **visible**,
+not blocked. Restricted to `service = 'emergency'` — potholes and graffiti were
+never in WCC's scoping conversation and auditing them buries the rows that
+matter.
 
 Published on every `gold.report` row, and worth knowing about before you render
 anything:
@@ -212,9 +245,17 @@ so the route forwards the validated body without remapping keys:
 `contactLastName`, `contactEmail`, `contactPhone`, `attachmentUploadKeys`,
 `observedAt`, `sourceChannel`.
 
+**Retired codes still work.** Three pairs of categories were merged (see
+[classification.md](classification.md)). A client sending `flooding`, `coastal`,
+`road-blocked`, `access-cut`, `power-out` or `water-out` is **not** rejected: the
+report is stored under the merged code and the response says so via
+`faultTypeRemapped: true`. A form built against the old list keeps working, which
+is the whole reason the old codes were retired as aliases rather than deleted.
+
 It refuses, with `errcode 22023`:
 
-- an unknown or inactive `faultType`;
+- an unknown `faultType`, or one that is inactive *without* a `supersededBy` to
+  resolve to;
 - **any fault type marked `intake_blocked`** — life-safety categories are refused
   at the database, not just hidden in the form. A prototype that quietly absorbs
   one of these and files it in a queue would be worse than no prototype;
@@ -229,7 +270,11 @@ Returns the reference immediately. The acknowledgement is the product:
 
 ```jsonc
 { "reference": "WCC-2GVRP", "status": "received", "legacyStatus": "received",
-  "statusLabel": "Received", "receivedAt": "…", "message": "…",
+  "statusLabel": "Received", "receivedAt": "…",
+  "faultType": "surface-flood",     // what it was stored as
+  "faultLabel": "Surface flooding",
+  "faultTypeRemapped": true,        // true when a retired code was resolved
+  "message": "…",
   "disclaimer": "This is a prototype, not an operational emergency service. In an emergency call 111." }
 ```
 
@@ -249,12 +294,39 @@ Accepts either vocabulary (`checking` → `under_review`, `acting` →
 Append-only: it writes an event and lets the trigger update the report, so there
 is no way to rewrite history through this API.
 
+### `gold.triage_report(...)` → the receipt
+
+`POST /rest/v1/rpc/triage_report`
+
+**Service role only** — `anon`, `authenticated` and `public` are explicitly
+revoked. Triage is a Council judgement: who owns a job and how urgent it is are
+not things a public key may decide.
+
+| Parameter | Type | |
+|---|---|---|
+| `reference` | `text` | Required |
+| `priority` | `integer` | 1 (critical) to 4 (low). See `gold.priority_level` |
+| `ownership` | `text` | `wcc_lead`, `shared` or `not_wcc` |
+| `agencyCode` | `text` | Who it routes to |
+| `onCouncilLand` | `boolean` | The distinction most of WCC's ownership rules turn on |
+| `status` | `text` | Accepts either vocabulary, same as `advance_status` |
+| `note` | `text` | |
+
+Every parameter but `reference` is optional and null means "leave it alone", so
+setting a priority does not silently clear an ownership call.
+
+This is what makes the classification a triage tool rather than a category
+lookup. Until it existed, `silver.triage_report()` was unreachable — `silver` has
+no URL — so every report published `priorityBasis: category_default` forever, and
+`service-outage`, which is deliberately unclassified, would have sat owned by
+nobody.
+
 ## Grants at a glance
 
 | Role | Can |
 |---|---|
-| `anon`, `authenticated` | `select` on the gold views; execute `reports_geojson`, `hubs_geojson`, `clusters_geojson`, `report_receipt`, `submit_report` |
-| service role | The above, plus `advance_status` |
+| `anon`, `authenticated` | `select` on the gold views; execute `reports_geojson`, `hubs_geojson`, `clusters_geojson`, `report_receipt`, `submit_report`, `layer_geojson` |
+| service role | The above, plus `advance_status` and `triage_report` |
 | Nobody outside the database | Anything in `silver` |
 
 ## How gold views reach silver — do not "tidy" this away
@@ -288,20 +360,28 @@ Closed as of 8 August 2026:
   so nothing that already reads it breaks. Lookup is case-insensitive.
 - ~~`intake_blocked` is `false` for every category~~ — fixed in
   `20260808000011`. `assistance` and `building-damage` now refuse at intake with
-  a message telling the reporter to call 111. The contact-centre categories
-  (`biohazard`, `water-out`, `power-out`) are deliberately still accepted: they
-  are urgent but not life-safety, and a late report of a burst main is still
-  worth having.
+  a message telling the reporter to call 111. The contact-centre categories are
+  deliberately still accepted: they are urgent but not life-safety, and a late
+  report of a burst main is still worth having. (That migration names them as
+  `biohazard`, `water-out` and `power-out`; the latter two have since merged into
+  `service-outage`, which is likewise not blocked.)
 - ~~The service role has no `usage` on schema `gold`~~ — fixed in
   `20260808000010`. `service_role` has `usage`, `select` and `execute` across
   `gold`. `advance_status` is granted to `service_role` **only** — `anon` and
   `authenticated` are explicitly revoked, because moving a report to
   "Completed & confirmed" is a Council statement about the world.
 
+- ~~Nothing in `gold` sets priority or ownership~~ — fixed in
+  `20260808000016`. `gold.triage_report` writes both, service role only.
+
 Still open:
 
-- **Nothing in `gold` sets priority or ownership.** Both are read-only over the
-  API; triage happens in `silver`. See [workflow-gaps.md](workflow-gaps.md).
+- **The report form offers six retired codes and none of the three merged ones.**
+  `prototype/lib/taxonomy.ts` still lists `flooding`, `coastal`, `road-blocked`,
+  `access-cut`, `power-out` and `water-out`. Submissions succeed — that is what
+  the aliasing is for — but the form still shows the split boxes the merge
+  existed to remove, and `helpText`/`alsoCovers` are not read by anything yet.
+  See [workflow-gaps.md](workflow-gaps.md).
 
 ## One more thing worth knowing
 
@@ -319,3 +399,12 @@ contact details and gets a reference, none of those details reach `gold`, the
 description is held at `withheld_pending_review`, `service_role` walks the
 report to Completed & confirmed, and `anon` reads the whole trail back from the
 reference in lower case.
+
+**`20260808000012`–`20260808000017` are documented from the migration source,
+not from a run.** `triage_report`, `scope_audit`, `report_category`, the
+`fault_type` columns and the alias remapping in `submit_report` are all
+described as written. Nobody has yet applied the chain to a clean database and
+exercised these over HTTP the way the first eleven were. Treat the shapes above
+as the intent of the code, and re-run
+`npm run check -- <url> "$NEXT_PUBLIC_SUPABASE_ANON_KEY"` before another team
+builds against them — 8 August 2026.

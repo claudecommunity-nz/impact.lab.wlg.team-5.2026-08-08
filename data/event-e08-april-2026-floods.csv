@@ -1,0 +1,1 @@
+sub_event_id,parent_event_id,event_date,event_time,suburb,street,latitude,longitude,issue_type,description,priority_estimate,reporting_resident_name,reporting_phone_no,reporting_email,image_source_url,source_publication,public_advice_nema,advice_source_url,job_status_illustrative,assigned_agency

@@ -60,6 +60,10 @@ const CLEARED = new Set([
   // Already in this repo as an export from GWRC's ArcGIS Hub open data portal,
   // with source and attribution recorded in wcc_emergency_hubs.geojson.
   'community-emergency-hubs',
+  // WCC's own public boundary layer, which prototype/lib/layers.ts already
+  // fetches from WCC and draws in the browser. Serving the same polygons from
+  // our copy discloses nothing that was not already public.
+  'wcc-suburbs',
 ])
 
 // Layers worth holding a local copy of: the ones a duty officer needs when the
@@ -77,6 +81,7 @@ const CLEARED = new Set([
 // Both answered "Invalid or missing input parameters" and a 400 until asked
 // properly.
 const MIRROR = [
+  'wcc-suburbs',
   'community-emergency-hubs',
   'emergency-water-tanks',
   'emergency-routes',
@@ -89,6 +94,38 @@ const MIRROR = [
   { id: 'fault-hazard-overlay', sublayers: [46, 47, 48, 49] },
   // 1% AEP — the one-in-a-hundred-year extent, which is the one people mean.
   { id: 'flood-hazard-areas', sublayers: [2, 3] },
+]
+
+// Layers the app needs that the upstream catalogue does not list.
+//
+// Suburb boundaries are the notable one. prototype/lib/layers.ts fetches all 57
+// polygons from WCC on every page load and falls back to an empty collection
+// when WCC does not answer — which silently removes every boundary from the
+// console at the exact moment someone is relying on it, with no error shown.
+// Mirrored here it is one query against our own database, and the fallback
+// stops being a hidden failure.
+//
+// maxAllowableOffset generalises server-side, for the same reason the app
+// already does it: full resolution is 920KB, this is about 123KB, and at the
+// zoom a duty officer works at the difference is invisible.
+const EXTRA_DATASETS = [
+  {
+    id: 'wcc-suburbs',
+    display_name: 'Suburb Boundaries (Wellington City)',
+    name: 'Suburb Boundaries',
+    theme_label: 'Boundaries',
+    authority: 'Wellington City Council',
+    url: 'https://gis.wcc.govt.nz/arcgis/rest/services/PropertyAndBoundaries/Boundaries/MapServer/4',
+    service_root: 'https://gis.wcc.govt.nz/arcgis/rest/services/PropertyAndBoundaries/Boundaries/MapServer',
+    link_type: 'arcgis_rest',
+    server_type: 'MapServer',
+    layer_id: 4,
+    layer_type: 'Feature Layer',
+    feature_queryable: true,
+    raster_only: false,
+    licence_note: null,
+    from_spreadsheet: false,
+  },
 ]
 
 const mirrorId = (m) => (typeof m === 'string' ? m : m.id)
@@ -304,7 +341,7 @@ async function fetchOne(dataset, startOffset) {
 // ---------------------------------------------------------------------------
 
 const catalogue = await loadCatalogue()
-const datasets = catalogue.datasets
+const datasets = [...catalogue.datasets, ...EXTRA_DATASETS]
 const catalogueOnly = process.argv.includes('--catalogue-only')
 
 const out = []

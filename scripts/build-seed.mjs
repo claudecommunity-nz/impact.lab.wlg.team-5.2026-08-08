@@ -43,7 +43,7 @@ const R = (o) => o
 const REPORTS = [
   // --- a cluster: five people on the same stretch of Evans Bay Parade -------
   R({
-    reference: 'WCC-4KDPM', faultType: 'flooding', severity: 'disruption', photos: 1,
+    reference: 'WCC-4KDPM', faultType: 'surface-flood', severity: 'disruption', photos: 1,
     faultDesc: 'Water across both lanes outside the marina, about ankle deep. Cars slowing right down.',
     locAddress: 'Evans Bay Parade, Hataitai', locSuburb: 'Hataitai',
     lat: -41.3025, lng: 174.7982, minutesAgo: 74,
@@ -53,19 +53,19 @@ const REPORTS = [
     ],
   }),
   R({
-    reference: 'WCC-9WQHT', faultType: 'flooding', severity: 'disruption',
+    reference: 'WCC-9WQHT', faultType: 'surface-flood', severity: 'disruption',
     faultDesc: 'Surface flooding by the boat sheds, getting deeper than an hour ago.',
     locAddress: 'Evans Bay Parade, near Cog Park', locSuburb: 'Hataitai',
     lat: -41.3041, lng: 174.7967, minutesAgo: 52,
   }),
   R({
-    reference: 'WCC-2FMRX', faultType: 'flooding', severity: 'info', photos: 1,
+    reference: 'WCC-2FMRX', faultType: 'surface-flood', severity: 'info', photos: 1,
     faultDesc: 'Drain blocked with leaves, water backing up over the footpath.',
     locAddress: 'Evans Bay Parade', locSuburb: 'Hataitai',
     lat: -41.3009, lng: 174.7995, minutesAgo: 41,
   }),
   R({
-    reference: 'WCC-7YHKC', faultType: 'flooding', severity: 'disruption',
+    reference: 'WCC-7YHKC', faultType: 'surface-flood', severity: 'disruption',
     faultDesc: 'Hub team walked the parade. Water over the kerb for roughly 200m, passable but slow.',
     locAddress: 'Evans Bay Parade, Hataitai', locSuburb: 'Hataitai',
     lat: -41.3033, lng: 174.7975, minutesAgo: 22,
@@ -75,7 +75,7 @@ const REPORTS = [
     verification: 'field_confirmed',
   }),
   R({
-    reference: 'WCC-7KRND', faultType: 'flooding', severity: 'urgent',
+    reference: 'WCC-7KRND', faultType: 'surface-flood', severity: 'urgent',
     faultDesc: 'Water is up to the door sills on parked cars now. Someone has driven into it and stalled.',
     locAddress: 'Evans Bay Parade, opposite the marina', locSuburb: 'Hataitai',
     lat: -41.3018, lng: 174.7989, minutesAgo: 14,
@@ -119,13 +119,13 @@ const REPORTS = [
     ],
   }),
   R({
-    reference: 'WCC-5QAXM', faultType: 'coastal', severity: 'disruption', photos: 1,
+    reference: 'WCC-5QAXM', faultType: 'surface-flood', severity: 'disruption', photos: 1,
     faultDesc: 'Waves coming right over the sea wall onto the road at high tide, gravel everywhere.',
     locAddress: 'The Esplanade, Island Bay', locSuburb: 'Island Bay',
     lat: -41.3403, lng: 174.7716, minutesAgo: 58,
   }),
   R({
-    reference: 'WCC-4HLWU', faultType: 'road-blocked', severity: 'urgent',
+    reference: 'WCC-4HLWU', faultType: 'road-closure', severity: 'urgent',
     faultDesc: 'Road closed by debris just past the corner, no way through for a car.',
     locAddress: 'Happy Valley Road, Owhiro Bay', locSuburb: 'Owhiro Bay',
     lat: -41.3437, lng: 174.7549, minutesAgo: 35,
@@ -138,10 +138,14 @@ const REPORTS = [
     hubName: 'Newtown - Newtown School', verification: 'official', sourceChannel: 'hub_radio',
   }),
   R({
-    reference: 'WCC-2GVRP', faultType: 'access-cut', severity: 'urgent',
+    reference: 'WCC-2GVRP', faultType: 'road-closure', severity: 'urgent',
     faultDesc: 'Six houses up the lane have no vehicle access, slip at the bottom of the driveway.',
     locAddress: 'Rawhiti Terrace, Kelburn', locSuburb: 'Kelburn',
     lat: -41.2851, lng: 174.7615, minutesAgo: 17,
+    // Names a small group of households and their situation. 'road-closure'
+    // publishes at street level, which is right for a blocked road and wrong
+    // for this, so it is overridden per report.
+    precision: 'zone_100m',
   }),
   R({
     // Kept verbatim from prototype/lib/seed.ts and reports.geojson, 'Z' and all,
@@ -155,7 +159,7 @@ const REPORTS = [
 
   // --- lifecycle cases the app has no vocabulary for yet --------------------
   R({
-    reference: 'WCC-6HMPX', faultType: 'power-out', severity: 'disruption', sourceChannel: 'phone',
+    reference: 'WCC-6HMPX', faultType: 'service-outage', severity: 'disruption', sourceChannel: 'phone',
     faultDesc: 'Power off along the top of the hill, about thirty houses by the look of it.',
     locAddress: 'Curtis Street, Karori', locSuburb: 'Karori',
     lat: -41.2864, lng: 174.7401, minutesAgo: 142,
@@ -165,7 +169,7 @@ const REPORTS = [
     ],
   }),
   R({
-    reference: 'WCC-9FDCR', faultType: 'water-out', severity: 'urgent', sourceChannel: 'phone',
+    reference: 'WCC-9FDCR', faultType: 'service-outage', severity: 'urgent', sourceChannel: 'phone',
     faultDesc: 'Main has burst at the intersection, water running down the hill and no supply to the houses above.',
     locAddress: 'Coutts Street, Kilbirnie', locSuburb: 'Kilbirnie',
     lat: -41.3241, lng: 174.7969, minutesAgo: 88,
@@ -175,7 +179,7 @@ const REPORTS = [
     ],
   }),
   R({
-    reference: 'WCC-4NPGD', faultType: 'coastal', severity: 'urgent',
+    reference: 'WCC-4NPGD', faultType: 'surface-flood', severity: 'urgent',
     faultDesc: 'Sea is over the road again on the high tide. It was cleared this morning but it is back.',
     locAddress: 'Owhiro Bay Parade', locSuburb: 'Owhiro Bay',
     lat: -41.3459, lng: 174.7625, minutesAgo: 120,
@@ -198,7 +202,7 @@ const REPORTS = [
     ],
   }),
   R({
-    reference: 'WCC-2XLVT', faultType: 'road-blocked', severity: 'urgent',
+    reference: 'WCC-2XLVT', faultType: 'road-closure', severity: 'urgent',
     faultDesc: 'Tree across the road about a kilometre past the school, no way through.',
     locAddress: 'Makara Road', locSuburb: 'Makara',
     lat: -41.2688, lng: 174.7044, minutesAgo: 175,
@@ -210,7 +214,7 @@ const REPORTS = [
     ],
   }),
   R({
-    reference: 'WCC-5CDHY', faultType: 'flooding', severity: 'disruption',
+    reference: 'WCC-5CDHY', faultType: 'surface-flood', severity: 'disruption',
     faultDesc: 'Stream has come up over the walkway by the shops, about knee deep at the low point.',
     locAddress: 'Main Road, Tawa', locSuburb: 'Tawa',
     lat: -41.1731, lng: 174.8259, minutesAgo: 67,
@@ -223,7 +227,8 @@ const REPORTS = [
     lat: -41.3339, lng: 174.7871, minutesAgo: 49,
   }),
   R({
-    reference: 'WCC-3RQWE', faultType: 'access-cut', severity: 'urgent',
+    reference: 'WCC-3RQWE', faultType: 'road-closure', severity: 'urgent',
+    precision: 'zone_100m',
     faultDesc: 'Only road out is blocked by a slip. Four households up here, one with a person on home oxygen.',
     locAddress: 'Maida Vale Road, Roseneath', locSuburb: 'Roseneath',
     lat: -41.2874, lng: 174.8028, minutesAgo: 38,
@@ -257,13 +262,13 @@ const REPORTS = [
     ],
   }),
   R({
-    reference: 'WCC-8QARM', faultType: 'flooding', severity: 'info',
+    reference: 'WCC-8QARM', faultType: 'surface-flood', severity: 'info',
     faultDesc: 'Water pooling across the car park entrance, not deep but it is spreading.',
     locAddress: 'Park Road, Miramar', locSuburb: 'Miramar',
     lat: -41.3179, lng: 174.8154, minutesAgo: 44,
   }),
   R({
-    reference: 'WCC-4GJTV', faultType: 'road-blocked', severity: 'disruption',
+    reference: 'WCC-4GJTV', faultType: 'road-closure', severity: 'disruption',
     faultDesc: 'Slip debris across one lane on the bend, passable slowly but not in the dark.',
     locAddress: 'Seatoun Heights Road', locSuburb: 'Seatoun',
     lat: -41.3251, lng: 174.8331, minutesAgo: 72,
@@ -323,7 +328,7 @@ w(
 w(`-- Reports ------------------------------------------------------------------`)
 w(`insert into silver.report (
   reference, service, fault_type, severity, fault_desc,
-  geom, loc_address, loc_suburb,
+  geom, loc_address, loc_suburb, precision_override,
   reporter_kind, hub_id,
   attachment_upload_keys, photo_count,
   observed_at, submitted_at,
@@ -339,7 +344,7 @@ w(
       ? `(select id from silver.hub where name = ${q(r.hubName)})`
       : 'null'
     return `  (${q(r.reference)}, ${q(r.service || 'emergency')}, ${q(r.faultType)}, ${q(r.severity)}, ${q(r.faultDesc)},
-   extensions.st_setsrid(extensions.st_makepoint(${r.lng}, ${r.lat}), 4326), ${q(r.locAddress)}, ${q(r.locSuburb)},
+   extensions.st_setsrid(extensions.st_makepoint(${r.lng}, ${r.lat}), 4326), ${q(r.locAddress)}, ${q(r.locSuburb)}, ${q(r.precision)},
    ${q(r.reporterKind || 'resident')}, ${hub},
    ${arr(keys)}, ${photos},
    ${mins(r.minutesAgo)}, ${mins(r.minutesAgo)},
